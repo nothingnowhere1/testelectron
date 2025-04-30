@@ -102,13 +102,28 @@ if (process.platform === "win32") {
             return false;
         });
 
-        // Block common Windows key combinations
-        globalShortcut.register("CommandOrControl+Esc", () => false);
-        globalShortcut.register("Meta+D", () => false);
-        globalShortcut.register("Meta+E", () => false);
-        globalShortcut.register("Meta+R", () => false);
-        globalShortcut.register("Meta+F", () => false);
-        globalShortcut.register("Meta+Tab", () => false);
+        // Block additional key combinations
+        // Block Alt+Tab
+        globalShortcut.register("Alt+Tab", () => {
+            console.log("Alt+Tab blocked");
+            return false;
+        });
+        
+        // Block Alt+Esc
+        globalShortcut.register("Alt+Escape", () => {
+            console.log("Alt+Escape blocked");
+            return false;
+        });
+        
+        // Block Ctrl+Alt+Delete (though this likely can't be fully blocked)
+        try {
+            globalShortcut.register("Ctrl+Alt+Delete", () => {
+                console.log("Attempted to block Ctrl+Alt+Delete");
+                return false;
+            });
+        } catch (error) {
+            console.log("Cannot block Ctrl+Alt+Delete: ", error);
+        }
         
         // Block Super key combinations (alternative naming)
         globalShortcut.register("Super+D", () => false);
@@ -179,7 +194,7 @@ if (process.platform === "win32") {
     // Notify renderer process
     mainWindow.webContents.send("kiosk-mode-changed", true)
 
-    // Apply Windows-specific enhancements
+// Apply Windows-specific enhancements
     if (process.platform === "win32") {
         enhanceWindowsKioskMode(true)
         
@@ -187,12 +202,23 @@ if (process.platform === "win32") {
         const { blockWindowsKeyStartMenu } = require("./kiosk-helper.js")
         blockWindowsKeyStartMenu()
         
+        // Block Alt+Tab switching
+        const { blockAltTabSwitching } = require('./altTabBlocker.js')
+        blockAltTabSwitching()
+        
         // Add renderer process listener to respond to key events
         mainWindow.webContents.on('before-input-event', (event, input) => {
             // Block Windows key at browser level
             if (input.key === 'Meta' || input.key === 'OS' || input.code === 'MetaLeft' || input.code === 'MetaRight') {
                 event.preventDefault();
                 console.log("Windows key blocked at browser level");
+                return false;
+            }
+            
+            // Block Alt+Tab at browser level
+            if (input.altKey && input.key === 'Tab') {
+                event.preventDefault();
+                console.log("Alt+Tab blocked at browser level");
                 return false;
             }
         });
@@ -215,6 +241,22 @@ function disableKioskMode() {
     // Restore Windows settings
     if (process.platform === "win32") {
         enhanceWindowsKioskMode(false)
+        
+        // Restore Alt+Tab functionality
+        try {
+            const { restoreAltTabSwitching } = require('./altTabBlocker.js')
+            restoreAltTabSwitching()
+        } catch (error) {
+            console.error("Failed to restore Alt+Tab functionality:", error)
+        }
+        
+        // Restore Windows key functionality
+        try {
+            const { restoreWindowsKeyFunctionality } = require('./win-key-blocker')
+            restoreWindowsKeyFunctionality()
+        } catch (error) {
+            console.error("Failed to restore Windows key functionality:", error)
+        }
     }
 
     // Unregister all shortcuts
