@@ -34,18 +34,23 @@ Option Explicit
 Dim WshShell
 Set WshShell = CreateObject("WScript.Shell")
 
+' Save original settings first (safer restoration)
+WshShell.RegWrite "HKCU\\Software\\KioskAppBackup\\TaskbarSmallIcons", WshShell.RegRead("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarSmallIcons"), "REG_DWORD"
+On Error Resume Next
+WshShell.RegWrite "HKCU\\Software\\KioskAppBackup\\IconsOnly", WshShell.RegRead("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\IconsOnly"), "REG_DWORD"
+WshShell.RegWrite "HKCU\\Software\\KioskAppBackup\\TaskbarAnimations", WshShell.RegRead("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarAnimations"), "REG_DWORD"
+On Error Goto 0
+
 ' Modify registry to disable Alt+Tab
 WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\DisallowShaking", 1, "REG_DWORD"
 WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\ExtendedUIHoverTime", 1, "REG_DWORD"
 WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarNoThumbnail", 1, "REG_DWORD"
-WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarSmallIcons", 1, "REG_DWORD"
 WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\ListviewAlphaSelect", 0, "REG_DWORD"
 WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarAnimations", 0, "REG_DWORD"
-WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\IconsOnly", 1, "REG_DWORD"
 
-' Restart Explorer to apply changes
-WshShell.Run "taskkill /f /im explorer.exe", 0, True
-WshShell.Run "explorer.exe", 0, False
+' Do NOT modify these settings as they affect taskbar appearance
+' WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarSmallIcons", 1, "REG_DWORD"
+' WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\IconsOnly", 1, "REG_DWORD"
 
 WScript.Echo "Alt+Tab blocking registry changes applied"
   `;
@@ -161,30 +166,92 @@ public class AltTabBlocker {
 }
 
 /**
- * Restore Alt+Tab functionality
+ * Restore Alt+Tab functionality and fix taskbar appearance
  */
 function restoreAltTabSwitching() {
   if (process.platform !== 'win32') return false;
   
   try {
-    // Restore registry settings
-    exec(`
-      reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v DisallowShaking /f
-      reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v ExtendedUIHoverTime /f
-      reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarNoThumbnail /f
-      reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSmallIcons /f
-      reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v ListviewAlphaSelect /f
-      reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarAnimations /f
-      reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v IconsOnly /f
-    `);
+    // Create and run VBS script to restore original settings
+    const restoreVbsContent = `
+    ' RestoreSettings.vbs - Restores original Windows settings
+    Option Explicit
+    
+    Dim WshShell
+    Set WshShell = CreateObject("WScript.Shell")
+    
+    ' Delete registry modifications we made
+    On Error Resume Next
+    WshShell.RegDelete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\DisallowShaking"
+    WshShell.RegDelete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\ExtendedUIHoverTime"
+    WshShell.RegDelete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarNoThumbnail"
+    WshShell.RegDelete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\ListviewAlphaSelect"
+    
+    ' Restore original settings from backup
+    On Error Resume Next
+    If WshShell.RegRead("HKCU\\Software\\KioskAppBackup\\TaskbarSmallIcons") <> "" Then
+        WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarSmallIcons", WshShell.RegRead("HKCU\\Software\\KioskAppBackup\\TaskbarSmallIcons"), "REG_DWORD"
+    End If
+    
+    If WshShell.RegRead("HKCU\\Software\\KioskAppBackup\\IconsOnly") <> "" Then
+        WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\IconsOnly", WshShell.RegRead("HKCU\\Software\\KioskAppBackup\\IconsOnly"), "REG_DWORD"
+    End If
+    
+    If WshShell.RegRead("HKCU\\Software\\KioskAppBackup\\TaskbarAnimations") <> "" Then
+        WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarAnimations", WshShell.RegRead("HKCU\\Software\\KioskAppBackup\\TaskbarAnimations"), "REG_DWORD"
+    End If
+    
+    ' Default values if backup doesn't exist
+    If Err.Number <> 0 Then
+        On Error Resume Next
+        ' These are Windows 10/11 default values
+        WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarSmallIcons", 0, "REG_DWORD"
+        WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\IconsOnly", 0, "REG_DWORD"
+        WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarAnimations", 1, "REG_DWORD"
+    End If
+    
+    ' Clean up our backup
+    On Error Resume Next
+    WshShell.RegDelete "HKCU\\Software\\KioskAppBackup\\TaskbarSmallIcons"
+    WshShell.RegDelete "HKCU\\Software\\KioskAppBackup\\IconsOnly"
+    WshShell.RegDelete "HKCU\\Software\\KioskAppBackup\\TaskbarAnimations"
+    WshShell.RegDelete "HKCU\\Software\\KioskAppBackup\\"
+    
+    ' Fix specific taskbar size issue
+    WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarSizeMove", 1, "REG_DWORD"
+    WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarSmallIcons", 0, "REG_DWORD"
+    
+    ' Restart Explorer to apply changes
+    On Error Resume Next
+    WshShell.Run "taskkill /f /im explorer.exe", 0, True
+    WshShell.Run "explorer.exe", 0, False
+    
+    WScript.Echo "Original settings restored"
+    `;
+    
+    const restoreVbsPath = path.join(__dirname, 'RestoreSettings.vbs');
+    fs.writeFileSync(restoreVbsPath, restoreVbsContent);
+    
+    // Run the VBS script
+    exec(`cscript //nologo "${restoreVbsPath}"`, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`Error executing restore script: ${error}`);
+      } else {
+        console.log(`Restore output: ${stdout}`);
+      }
+    });
     
     // Kill the PowerShell script
     exec('taskkill /f /im powershell.exe /fi "WINDOWTITLE eq *BlockAltTab*"');
     
-    // Restart Explorer
-    exec('taskkill /f /im explorer.exe && start explorer.exe');
+    // Apply additional fixes for taskbar size
+    exec(`
+      reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSizeMove /t REG_DWORD /d 1 /f
+      reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSmallIcons /t REG_DWORD /d 0 /f
+      reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarGlomLevel /t REG_DWORD /d 0 /f
+    `);
     
-    console.log('Alt+Tab functionality restored');
+    console.log('Alt+Tab functionality and taskbar appearance restored');
     return true;
   } catch (error) {
     console.error('Error restoring Alt+Tab functionality:', error);
