@@ -252,8 +252,8 @@ function disableKioskMode() {
         
         // Restore Windows key functionality
         try {
-            const { restoreWindowsKeyFunctionality } = require('./win-key-blocker')
-            restoreWindowsKeyFunctionality()
+            const { stopBlockingWindowsKey } = require('./win-key-blocker')
+            stopBlockingWindowsKey()
         } catch (error) {
             console.error("Failed to restore Windows key functionality:", error)
         }
