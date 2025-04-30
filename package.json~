@@ -1,0 +1,26 @@
+{
+  "name": "electron-kiosk-app",
+  "version": "1.0.0",
+  "description": "Electron application with kiosk mode functionality",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "start": "electron .",
+    "dev": "cross-env NODE_ENV=development electron .",
+    "build": "electron-builder"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.example.electron-kiosk",
+    "productName": "Electron Kiosk",
+    "win": {
+      "target": "nsis"
+    }
+  }
+}

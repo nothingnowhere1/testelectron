@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Electron Kiosk Mode</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Electron Kiosk Mode Application</h1>
+    
+    <div class="status-container">
+      <p>Current Mode: <span id="mode-status">Normal</span></p>
+    </div>
+    
+    <div class="controls">
+      <button id="enable-kiosk">Enable Kiosk Mode</button>
+      <button id="disable-kiosk" disabled>Disable Kiosk Mode</button>
+    </div>
+    
+    <div class="info">
+      <h2>Kiosk Mode Features:</h2>
+      <ul>
+        <li>Always on top</li>
+        <li>Not closable</li>
+        <li>All keyboard shortcuts blocked</li>
+        <li>Full screen</li>
+      </ul>
+      
+      <div class="warning">
+        <p><strong>Note:</strong> When in kiosk mode, you can only exit using the "Disable Kiosk Mode" button.</p>
+        <p>Admin password can be implemented for additional security.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

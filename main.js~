@@ -1,0 +1,249 @@
+// main.js
+const { app, BrowserWindow, ipcMain, globalShortcut, screen } = require("electron")
+const path = require("path")
+const { enhanceWindowsKioskMode, disableTaskbarCompletely } = require("./kiosk-helper.js")
+
+let mainWindow
+let isKioskMode = false
+let blockingWindow = null
+
+function createWindow() {
+    mainWindow = new BrowserWindow({
+        width: 800,
+        height: 600,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false,
+        },
+    })
+
+    mainWindow.loadFile("index.html")
+
+    // Open DevTools in development
+    if (process.env.NODE_ENV === "development") {
+        mainWindow.webContents.openDevTools()
+    }
+
+    // Prevent new windows from being created
+    mainWindow.webContents.setWindowOpenHandler(() => {
+        return { action: "deny" }
+    })
+}
+
+// Create a transparent blocking window that sits at the bottom of the screen
+// to prevent taskbar access
+function createBlockingWindow() {
+    if (blockingWindow) {
+        blockingWindow.close()
+        blockingWindow = null
+    }
+
+    const primaryDisplay = screen.getPrimaryDisplay()
+    const { width, height } = primaryDisplay.bounds
+
+    // Create a window that covers just the taskbar area
+    blockingWindow = new BrowserWindow({
+        width: width,
+        height: 50, // Height of typical taskbar
+        x: 0,
+        y: height - 50, // Position at bottom of screen
+        frame: false,
+        transparent: true,
+        alwaysOnTop: true,
+        skipTaskbar: true,
+        focusable: false, // Make it non-focusable
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false,
+        },
+    })
+
+    // Load a transparent HTML page
+    blockingWindow.loadFile("blocker.html")
+
+    // Prevent the window from being closed
+    blockingWindow.on("close", (event) => {
+        if (isKioskMode) {
+            event.preventDefault()
+        }
+    })
+}
+
+// Enable kiosk mode
+function enableKioskMode() {
+    if (!mainWindow) return
+
+    isKioskMode = true
+
+    // Create blocking window for taskbar
+    createBlockingWindow()
+
+    // Apply aggressive Windows-specific enhancements first
+    if (process.platform === "win32") {
+        enhanceWindowsKioskMode(true)
+        disableTaskbarCompletely(true)
+    }
+
+    // Set window properties for kiosk mode
+    mainWindow.setKiosk(true)
+
+    // Set window bounds to cover the entire screen including taskbar
+    const primaryDisplay = screen.getPrimaryDisplay()
+
+    // Set window to cover entire screen including taskbar
+    mainWindow.setPosition(0, 0)
+    mainWindow.setSize(primaryDisplay.bounds.width, primaryDisplay.bounds.height)
+
+    // Ensure window is above taskbar with highest z-order
+    mainWindow.setAlwaysOnTop(true, "screen-saver")
+
+    // Additional measures to prevent taskbar access
+    mainWindow.setSkipTaskbar(true)
+    mainWindow.setAutoHideMenuBar(true)
+    mainWindow.setMenuBarVisibility(false)
+    mainWindow.setClosable(false)
+    mainWindow.setFullScreen(true)
+
+    // Platform-specific key blocking
+    if (process.platform === "win32") {
+        // Windows-specific key blocking
+        try {
+            // Try different key combinations to block Windows key
+            globalShortcut.register("Meta", () => {
+                console.log("Windows key (Meta) blocked")
+                return false
+            })
+
+            // Block common Windows key combinations
+            globalShortcut.register("CommandOrControl+Esc", () => false)
+            globalShortcut.register("Meta+D", () => false)
+            globalShortcut.register("Meta+E", () => false)
+            globalShortcut.register("Meta+R", () => false)
+            globalShortcut.register("Meta+F", () => false)
+            globalShortcut.register("Meta+Tab", () => false)
+
+            // Block specific keys that might open Start menu
+            globalShortcut.register("Alt+Esc", () => false)
+            globalShortcut.register("Ctrl+Esc", () => false)
+        } catch (error) {
+            console.error("Failed to register Windows key blockers:", error)
+        }
+    } else if (process.platform === "darwin") {
+        // macOS-specific key blocking
+        try {
+            globalShortcut.register("Command", () => {
+                console.log("Command key blocked")
+                return false
+            })
+        } catch (error) {
+            console.error("Failed to register Command key blocker:", error)
+        }
+    }
+
+    // Register all common shortcuts to prevent them from working
+    const shortcuts = ["Alt+F4", "Alt+Tab", "Ctrl+Esc", "Ctrl+Shift+Esc", "F11", "Esc", "Tab", "Ctrl+W", "Alt+Space"]
+
+    // Block all function keys F1-F12
+    for (let i = 1; i <= 12; i++) {
+        try {
+            globalShortcut.register(`F${i}`, () => {
+                console.log(`F${i} is blocked in kiosk mode`)
+                return false
+            })
+        } catch (error) {
+            console.log(`Failed to register F${i}:`, error)
+        }
+    }
+
+    // Block common shortcuts
+    shortcuts.forEach((shortcut) => {
+        try {
+            globalShortcut.register(shortcut, () => {
+                console.log(`${shortcut} is blocked in kiosk mode`)
+                return false
+            })
+        } catch (error) {
+            console.log(`Failed to register shortcut: ${shortcut}`, error)
+        }
+    })
+
+    // Block all Alt combinations
+    try {
+        globalShortcut.register("Alt+F4", () => false)
+    } catch (error) {
+        console.log("Failed to register Alt+F4:", error)
+    }
+
+    // Notify renderer process
+    mainWindow.webContents.send("kiosk-mode-changed", true)
+}
+
+// Disable kiosk mode
+function disableKioskMode() {
+    if (!mainWindow) return
+
+    isKioskMode = false
+
+    // Close blocking window if it exists
+    if (blockingWindow) {
+        blockingWindow.close()
+        blockingWindow = null
+    }
+
+    // Reset window properties
+    mainWindow.setKiosk(false)
+    mainWindow.setAlwaysOnTop(false)
+    mainWindow.setClosable(true)
+    mainWindow.setFullScreen(false)
+    mainWindow.setMenuBarVisibility(true)
+
+    // Restore Windows settings
+    if (process.platform === "win32") {
+        enhanceWindowsKioskMode(false)
+        disableTaskbarCompletely(false)
+    }
+
+    // Unregister all shortcuts
+    globalShortcut.unregisterAll()
+
+    // Notify renderer process
+    mainWindow.webContents.send("kiosk-mode-changed", false)
+}
+
+// Handle IPC messages from renderer
+ipcMain.on("toggle-kiosk-mode", (event, enable) => {
+    if (enable) {
+        enableKioskMode()
+    } else {
+        disableKioskMode()
+    }
+})
+
+// Get current kiosk mode status
+ipcMain.handle("get-kiosk-mode", () => {
+    return isKioskMode
+})
+
+app.whenReady().then(() => {
+    createWindow()
+
+    app.on("activate", () => {
+        if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    })
+})
+
+app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") app.quit()
+})
+
+// Clean up when app is quitting
+app.on("will-quit", () => {
+    globalShortcut.unregisterAll()
+})
+
+// Prevent the app from exiting when in kiosk mode
+app.on("before-quit", (event) => {
+    if (isKioskMode) {
+        event.preventDefault()
+    }
+})

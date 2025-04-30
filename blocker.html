@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Taskbar Blocker</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: rgba(0, 0, 0, 0.01); /* Almost transparent */
+            user-select: none;
+            -webkit-user-select: none;
+            cursor: none;
+        }
+        #blocker {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+<div id="blocker"></div>
+<script>
+    // Prevent all mouse and touch events
+    const blocker = document.getElementById('blocker');
+
+    // Capture and prevent all events
+    ['mousedown', 'mouseup', 'click', 'dblclick', 'contextmenu',
+        'touchstart', 'touchend', 'touchmove', 'wheel', 'keydown', 'keyup'].forEach(eventType => {
+        blocker.addEventListener(eventType, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }, true);
+    });
+
+    // Keep window focused
+    setInterval(() => {
+        window.focus();
+    }, 100);
+</script>
+</body>
+</html>
