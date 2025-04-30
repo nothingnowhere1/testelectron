@@ -1,11 +1,10 @@
-// binding.gyp - Build configuration for native addon
 {
   "targets": [
     {
-      "target_name": "block_win_key",
+      "target_name": "win_key_blocker",
       "cflags!": [ "-fno-exceptions" ],
       "cflags_cc!": [ "-fno-exceptions" ],
-      "sources": [ "src/block-win-key.cc" ],
+      "sources": [ "src/win_key_blocker.cc" ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")"
       ],

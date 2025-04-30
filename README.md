@@ -1,59 +1,66 @@
-# Windows Key Blocker for Electron Kiosk Mode
+# Native Windows Key Blocker for Electron Kiosk Mode
 
-This solution provides a comprehensive approach to blocking the Windows key from opening the Start menu in Electron kiosk applications.
+This solution provides a system-level approach to blocking the Windows key from opening the Start menu in Electron kiosk applications, using a native C++ addon.
 
 ## How It Works
 
-This implementation uses multiple approaches to ensure the Windows key is completely blocked:
+This implementation uses Windows API's low-level keyboard hook to intercept and block the Windows key:
 
-1. **PowerShell-Based Keyboard Hook**
-   - Uses a PowerShell script with Windows API hooks to intercept Windows key presses
-   - Runs as a separate process that will continue blocking even if the main app crashes
+1. **Native C++ Addon with System-Level Hook**
+   - Uses Windows API `SetWindowsHookEx` with `WH_KEYBOARD_LL` to create a global keyboard hook
+   - Intercepts Windows key presses at the OS level before they reach any application
+   - Blocks both left and right Windows keys (VK_LWIN and VK_RWIN)
 
-2. **Registry Modifications**
-   - Applies multiple registry changes to disable Windows key functionality:
-     - `NoWinKeys` policy to disable Windows key shortcuts
-     - Disabling Start menu functionality
-     - Disabling Windows hotkeys
-
-3. **Start Menu Process Termination**
-   - Continuously monitors and kills the Start menu process if it attempts to launch
-   - Creates a background process that keeps the Start menu from appearing
-
-4. **Electron's Global Shortcut API**
-   - Blocks Windows key at the application level using Electron's built-in capabilities
+2. **Electron's Global Shortcut API (Fallback)**
+   - Acts as a secondary layer of protection using Electron's built-in capabilities
    - Covers multiple key identifiers (Meta, Super, LWin, RWin)
 
-5. **Browser-Level Event Interception**
-   - Captures key events at the browser level using `before-input-event`
-   - Prevents Windows key events from reaching the page
+## Installation & Building
 
-6. **DOM-Level Event Capture**
-   - Intercepts Windows key at the DOM level through the preload script
-   - Uses event capture phase for earlier interception
+The native addon requires compilation. Follow these steps to set up:
 
-## Installation
+1. Install required dependencies:
+   ```bash
+   npm install
+   ```
 
-Simply install the application's dependencies:
+2. Install build tools (if you don't have them already):
+   ```bash
+   npm install -g node-gyp
+   npm install -g windows-build-tools  # On Windows, run as Administrator
+   ```
 
-```
-npm install
-```
+3. Build the native addon:
+   ```bash
+   # For general Node.js
+   node-gyp rebuild
+   
+   # For Electron (recommended)
+   npm run rebuild
+   ```
 
-Then start the application:
-
-```
-npm start
-```
+4. Start the application:
+   ```bash
+   npm start
+   ```
 
 ## Requirements
 
 - Windows operating system
-- Administrator privileges (for registry modifications)
+- Visual Studio Build Tools (for C++ compilation)
+- Node.js 14+
+- Administrator privileges may be required
 
-## Notes
+## Troubleshooting
 
-- Some registry modifications require administrator privileges
-- The system may need to be restarted for certain changes to take full effect
-- This solution is designed for Windows specifically and will not affect other operating systems
-- When disabling kiosk mode, the application will attempt to restore normal Windows key functionality
+If you encounter build issues:
+
+1. Make sure you have Visual Studio Build Tools installed
+2. Run the command prompt or terminal as Administrator
+3. Ensure you have Python 2.7 installed (required for node-gyp)
+
+## Technical Details
+
+The native addon creates a system-level keyboard hook using `SetWindowsHookEx` with the `WH_KEYBOARD_LL` hook type. This allows it to intercept keyboard input at the lowest level possible, before it reaches any application, including the Windows shell.
+
+When a key press is detected, the hook checks if it's a Windows key (VK_LWIN = 0x5B or VK_RWIN = 0x5C) and if so, blocks it by returning 1 from the hook procedure.

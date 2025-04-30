@@ -1,4 +1,3 @@
-// block-win-key.cc - Native Node.js addon to block Win key
 #include <napi.h>
 #include <windows.h>
 
@@ -66,4 +65,4 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     return exports;
 }
 
-NODE_API_MODULE(block_win_key, Init)
+NODE_API_MODULE(win_key_blocker, Init)

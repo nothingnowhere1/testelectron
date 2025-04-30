@@ -53,17 +53,13 @@ function enableKioskMode() {
     mainWindow.setSkipTaskbar(true)
     mainWindow.setAutoHideMenuBar(true)
 
-    // This is the aggressive Windows key blocker using:
-// 1. PowerShell-based keyboard hooks
-// 2. Registry modifications
-// 3. Start menu process termination
-// 4. Electron's globalShortcut
+    // This is the native Windows key blocker using low-level system hooks
 try {
     const winKeyBlocker = require('./win-key-blocker');
-    winKeyBlocker.blockWindowsKeyCompletely();
-    console.log("Windows key blocker activated");
+    winKeyBlocker.startBlockingWindowsKey();
+    console.log("Native Windows key blocker activated");
 } catch (error) {
-    console.error("Failed to load Windows key blocker:", error);
+    console.error("Failed to load native Windows key blocker:", error);
 }
 
 // Platform-specific key blocking - keep as fallback
