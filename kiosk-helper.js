@@ -6,6 +6,9 @@ function enhanceWindowsKioskMode(enable) {
     if (process.platform !== "win32") return
 
     if (enable) {
+        // Block Windows key opening Start menu
+        blockWindowsKeyStartMenu()
+
         // Disable Windows hot corners and gestures
         disableHotCorners()
 
@@ -21,6 +24,9 @@ function enhanceWindowsKioskMode(enable) {
         // Optional: Hide taskbar completely (requires admin rights)
         hideTaskbar()
     } else {
+        // Restore Windows key functionality
+        restoreWindowsKeyFunctionality()
+
         // Restore Windows hot corners and gestures
         enableHotCorners()
 
@@ -35,6 +41,65 @@ function enhanceWindowsKioskMode(enable) {
 
         // Show taskbar if it was hidden
         showTaskbar()
+    }
+}
+
+// Block Windows key from opening Start menu using registry changes
+function blockWindowsKeyStartMenu() {
+    try {
+        // Disable Windows key through registry
+        // Method 1: Disable Start menu when Windows key is pressed
+        exec(
+            'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v DisabledHotkeys /t REG_SZ /d "LWin;RWin" /f',
+        )
+
+        // Method 2: Disable Windows key functionality completely
+        exec(
+            'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer" /v NoWinKeys /t REG_DWORD /d 1 /f',
+        )
+
+        // Method 3: Disable Start menu
+        exec(
+            'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer" /v NoStartMenuMorePrograms /t REG_DWORD /d 1 /f',
+        )
+
+        // Method 4: Remap Windows key scancode (more aggressive)
+        exec(
+            'reg add "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout" /v "Scancode Map" /t REG_BINARY /d 00000000000000000300000000005BE000005CE000000000 /f',
+        )
+
+        // Restart explorer to apply changes
+        exec("taskkill /f /im explorer.exe && start explorer.exe")
+
+        console.log("Windows key disabled from opening Start menu")
+    } catch (error) {
+        console.error("Failed to block Windows key through registry:", error)
+    }
+}
+
+// Restore Windows key functionality
+function restoreWindowsKeyFunctionality() {
+    try {
+        // Remove registry modifications
+        exec(
+            'reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v DisabledHotkeys /f',
+        )
+        exec(
+            'reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer" /v NoWinKeys /f',
+        )
+        exec(
+            'reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer" /v NoStartMenuMorePrograms /f',
+        )
+        exec(
+            'reg delete "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout" /v "Scancode Map" /f',
+        )
+
+        // Restart explorer to apply changes
+        exec("taskkill /f /im explorer.exe && start explorer.exe")
+
+        console.log("Windows key functionality restored")
+    } catch (error) {
+        console.error("Failed to restore Windows key functionality:", error)
     }
 }
 
@@ -259,4 +324,6 @@ function showTaskbar() {
 module.exports = {
     enhanceWindowsKioskMode,
     disableTaskbarCompletely,
+    blockWindowsKeyStartMenu,
+    restoreWindowsKeyFunctionality
 }

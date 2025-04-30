@@ -13,6 +13,7 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
+            preload: path.join(__dirname, 'preload.js'),
         },
     })
 
@@ -56,19 +57,55 @@ function enableKioskMode() {
     if (process.platform === "win32") {
         // Windows-specific key blocking
         try {
-            // Try different key combinations to block Windows key
+            // More aggressive Windows key blocking approach
+            // Block the Windows key itself (both left and right)
+            globalShortcut.register("Super", () => {
+                console.log("Windows key (Super) blocked")
+                return false
+            })
+            
+            // Block left Windows key specifically
+            globalShortcut.register("Super+L", () => {
+                console.log("Left Windows key blocked")
+                return false
+            })
+            
+            // Block right Windows key specifically  
+            globalShortcut.register("Super+R", () => {
+                console.log("Right Windows key blocked")
+                return false
+            })
+            
+            // Block Windows key as "Meta" (some systems use this identifier)
             globalShortcut.register("Meta", () => {
                 console.log("Windows key (Meta) blocked")
+                return false
+            })
+            
+            // Block LWin and RWin which are more specific identifiers
+            globalShortcut.register("LWin", () => {
+                console.log("LWin key blocked")
+                return false
+            })
+            
+            globalShortcut.register("RWin", () => {
+                console.log("RWin key blocked")
                 return false
             })
 
             // Block common Windows key combinations
             globalShortcut.register("CommandOrControl+Esc", () => false)
-            globalShortcut.register("Meta+D", () => false)
+            globalShortcut.register("Meta+D", () => false) 
             globalShortcut.register("Meta+E", () => false)
             globalShortcut.register("Meta+R", () => false)
             globalShortcut.register("Meta+F", () => false)
             globalShortcut.register("Meta+Tab", () => false)
+            
+            // Block Super key combinations (alternative naming)
+            globalShortcut.register("Super+D", () => false)
+            globalShortcut.register("Super+E", () => false)
+            globalShortcut.register("Super+F", () => false)
+            globalShortcut.register("Super+Tab", () => false)
         } catch (error) {
             console.error("Failed to register Windows key blockers:", error)
         }
@@ -136,6 +173,20 @@ function enableKioskMode() {
     // Apply Windows-specific enhancements
     if (process.platform === "win32") {
         enhanceWindowsKioskMode(true)
+        
+        // Import the new function directly to ensure it's called
+        const { blockWindowsKeyStartMenu } = require("./kiosk-helper.js")
+        blockWindowsKeyStartMenu()
+        
+        // Add renderer process listener to respond to key events
+        mainWindow.webContents.on('before-input-event', (event, input) => {
+            // Block Windows key at browser level
+            if (input.key === 'Meta' || input.key === 'OS' || input.code === 'MetaLeft' || input.code === 'MetaRight') {
+                event.preventDefault();
+                console.log("Windows key blocked at browser level");
+                return false;
+            }
+        });
     }
 }
 
