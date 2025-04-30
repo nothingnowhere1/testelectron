@@ -6,19 +6,19 @@ This solution provides a comprehensive approach to blocking the Windows key from
 
 This implementation uses multiple approaches to ensure the Windows key is completely blocked:
 
-1. **System-Level Keyboard Hook (Native Addon)**
-   - Uses Windows API `SetWindowsHookEx` with `WH_KEYBOARD_LL` to intercept and block Windows key presses at the system level
-   - Implemented as a native Node.js addon for maximum effectiveness
+1. **PowerShell-Based Keyboard Hook**
+   - Uses a PowerShell script with Windows API hooks to intercept Windows key presses
+   - Runs as a separate process that will continue blocking even if the main app crashes
 
-2. **PowerShell-Based Keyboard Hook (Fallback)**
-   - Provides a secondary keyboard hook using PowerShell and .NET if the native addon fails
-   - Uses similar Windows API calls but through PowerShell script
-
-3. **Registry Modifications**
+2. **Registry Modifications**
    - Applies multiple registry changes to disable Windows key functionality:
      - `NoWinKeys` policy to disable Windows key shortcuts
-     - Keyboard scancode remapping to neutralize Windows key
-     - Explorer hotkey disabling
+     - Disabling Start menu functionality
+     - Disabling Windows hotkeys
+
+3. **Start Menu Process Termination**
+   - Continuously monitors and kills the Start menu process if it attempts to launch
+   - Creates a background process that keeps the Start menu from appearing
 
 4. **Electron's Global Shortcut API**
    - Blocks Windows key at the application level using Electron's built-in capabilities
@@ -34,30 +34,26 @@ This implementation uses multiple approaches to ensure the Windows key is comple
 
 ## Installation
 
-1. Install dependencies:
-   ```
-   npm install
-   ```
+Simply install the application's dependencies:
 
-2. Build the native addon:
-   ```
-   npm run rebuild
-   ```
+```
+npm install
+```
 
-3. Start the application:
-   ```
-   npm start
-   ```
+Then start the application:
+
+```
+npm start
+```
 
 ## Requirements
 
 - Windows operating system
-- Node.js 14+
-- Visual Studio Build Tools (for native addon compilation)
-- Administrator privileges (for some registry modifications)
+- Administrator privileges (for registry modifications)
 
 ## Notes
 
-- Some registry modifications may require administrator privileges
-- The system may need to be restarted for certain changes to take effect
+- Some registry modifications require administrator privileges
+- The system may need to be restarted for certain changes to take full effect
 - This solution is designed for Windows specifically and will not affect other operating systems
+- When disabling kiosk mode, the application will attempt to restore normal Windows key functionality
