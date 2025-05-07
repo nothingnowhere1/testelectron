@@ -1,5 +1,5 @@
 // main.js
-const { app, BrowserWindow, ipcMain, globalShortcut, screen } = require("electron")
+const { app, BrowserWindow, ipcMain, globalShortcut, screen, dialog } = require("electron")
 const path = require("path")
 
 // Импортируем наш новый модуль для блокировки Windows клавиши
@@ -69,27 +69,38 @@ function enableKioskMode() {
 
     // Активируем расширенный режим киоска (блокирует Windows клавишу и Alt+Tab)
     if (process.platform === "win32") {
-        // Включаем все блокировки сразу
-        winKeyBlocker.enhanceKioskMode(true);
-        console.log("Windows key blocker activated in enhanced kiosk mode");
-        
-        // Добавляем дополнительную блокировку на уровне окна браузера
-        if (mainWindow && mainWindow.webContents) {
-            mainWindow.webContents.on('before-input-event', (event, input) => {
-                // Block Windows key at browser level
-                if (input.key === 'Meta' || input.key === 'OS' || input.code === 'MetaLeft' || input.code === 'MetaRight') {
-                    event.preventDefault();
-                    console.log("Windows key blocked at browser level");
-                    return false;
-                }
-                
-                // Block Alt+Tab at browser level
-                if (input.altKey && input.key === 'Tab') {
-                    event.preventDefault();
-                    console.log("Alt+Tab blocked at browser level");
-                    return false;
-                }
-            });
+        try {
+            // Создаем скрипт экстренного восстановления перед включением блокировки
+            winKeyBlocker.createEmergencyRestoreScript();
+            
+            // Включаем все блокировки сразу
+            winKeyBlocker.enhanceKioskMode(true);
+            console.log("Windows key blocker activated in enhanced kiosk mode");
+            
+            // Добавляем дополнительную блокировку на уровне окна браузера
+            if (mainWindow && mainWindow.webContents) {
+                mainWindow.webContents.on('before-input-event', (event, input) => {
+                    // Block Windows key at browser level
+                    if (input.key === 'Meta' || input.key === 'OS' || input.code === 'MetaLeft' || input.code === 'MetaRight') {
+                        event.preventDefault();
+                        console.log("Windows key blocked at browser level");
+                        return false;
+                    }
+                    
+                    // Block Alt+Tab at browser level
+                    if (input.altKey && input.key === 'Tab') {
+                        event.preventDefault();
+                        console.log("Alt+Tab blocked at browser level");
+                        return false;
+                    }
+                });
+            }
+        } catch (error) {
+            console.error("Failed to enable kiosk mode:", error);
+            dialog.showErrorBox(
+                "Ошибка активации режима киоска", 
+                "Произошла ошибка при активации режима киоска. Некоторые функции могут быть недоступны."
+            );
         }
     } else if (process.platform === "darwin") {
         // macOS-specific key blocking
@@ -126,8 +137,42 @@ function disableKioskMode() {
 
     // Отключаем блокировку Windows клавиши
     if (process.platform === "win32" && winKeyBlocker) {
-        winKeyBlocker.enhanceKioskMode(false);
-        console.log("Windows key blocker deactivated");
+        try {
+            // Сначала пробуем стандартное отключение
+            const result = winKeyBlocker.enhanceKioskMode(false);
+            console.log("Windows key blocker deactivation result:", result);
+            
+            // Если после стандартного отключения блокировка все еще активна,
+            // запускаем экстренное восстановление системы
+            if (winKeyBlocker.isActive()) {
+                console.log("Forcing system restore because blocker is still active");
+                winKeyBlocker.forceSystemRestore()
+                    .then(success => {
+                        console.log("Emergency system restore completed with result:", success);
+                    })
+                    .catch(error => {
+                        console.error("Error during emergency system restore:", error);
+                    });
+            }
+        } catch (error) {
+            console.error("Failed to disable kiosk mode:", error);
+            console.log("Attempting emergency system restore...");
+            
+            // При ошибке сразу запускаем экстренное восстановление
+            winKeyBlocker.forceSystemRestore()
+                .then(success => {
+                    console.log("Emergency system restore completed with result:", success);
+                })
+                .catch(error => {
+                    console.error("Error during emergency system restore:", error);
+                    
+                    // Показываем пользователю диалог с инструкциями
+                    dialog.showErrorBox(
+                        "Ошибка восстановления системы", 
+                        "Не удалось полностью восстановить функциональность Windows. Пожалуйста, выполните скрипт восстановления вручную: windows-key-blocker/scripts/EmergencySystemRestore.bat или перезагрузите компьютер."
+                    );
+                });
+        }
     }
 
     // Unregister all shortcuts
@@ -164,12 +209,30 @@ app.on("window-all-closed", () => {
 })
 
 // Clean up when app is quitting
-app.on("will-quit", () => {
+app.on("will-quit", (event) => {
     globalShortcut.unregisterAll()
     
     // Также отключаем блокировку Windows клавиши при выходе
-    if (process.platform === "win32" && winKeyBlocker) {
-        winKeyBlocker.disable();
+    if (process.platform === "win32" && winKeyBlocker && winKeyBlocker.isActive()) {
+        console.log("Disabling Windows key blocker on app exit");
+        
+        try {
+            // Задерживаем выход на время отключения блокировки
+            event.preventDefault();
+            
+            // Запускаем процесс восстановления
+            winKeyBlocker.forceSystemRestore()
+                .then(() => {
+                    console.log("System restored successfully, quitting app");
+                    app.exit(0);
+                })
+                .catch(error => {
+                    console.error("Failed to restore system on exit:", error);
+                    app.exit(1);
+                });
+        } catch (error) {
+            console.error("Error during system restore on exit:", error);
+        }
     }
 })
 
@@ -177,5 +240,25 @@ app.on("will-quit", () => {
 app.on("before-quit", (event) => {
     if (isKioskMode) {
         event.preventDefault()
+        
+        // Спрашиваем пользователя, хочет ли он выйти
+        dialog.showMessageBox(mainWindow, {
+            type: 'question',
+            buttons: ['Отмена', 'Выйти'],
+            defaultId: 0,
+            title: 'Выход из режима киоска',
+            message: 'Вы уверены, что хотите выйти из режима киоска?',
+            cancelId: 0
+        }).then(result => {
+            if (result.response === 1) {
+                // Отключаем режим киоска и разрешаем выход
+                disableKioskMode();
+                
+                // Даем время на восстановление системы и затем выходим
+                setTimeout(() => {
+                    app.exit(0);
+                }, 3000);
+            }
+        });
     }
 })
