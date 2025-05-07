@@ -1,0 +1,50 @@
+{
+  "name": "windows-key-blocker",
+  "version": "1.0.0",
+  "description": "A comprehensive module for blocking Windows key, Alt+Tab and other system shortcuts in Windows applications",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "clean": "rimraf dist",
+    "build": "npm run clean && tsc",
+    "prepare": "npm run build",
+    "install": "node-gyp rebuild"
+  },
+  "keywords": [
+    "windows",
+    "kiosk",
+    "keyboard",
+    "blocker",
+    "electron",
+    "win-key",
+    "alt-tab",
+    "typescript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "bindings": "^1.5.0",
+    "node-addon-api": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.11.18",
+    "rimraf": "^3.0.2",
+    "typescript": "^4.9.4",
+    "node-gyp": "^9.3.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "os": [
+    "win32"
+  ],
+  "files": [
+    "dist/**/*",
+    "addon/**/*",
+    "scripts/**/*",
+    "binding.gyp",
+    "LICENSE",
+    "README.md",
+    "index.js"
+  ]
+}
