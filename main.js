@@ -1,10 +1,13 @@
 // main.js
 const { app, BrowserWindow, ipcMain, globalShortcut, screen } = require("electron")
 const path = require("path")
-const { enhanceWindowsKioskMode } = require("./kiosk-helper.js")
+
+// Импортируем наш новый модуль для блокировки Windows клавиши
+const { initWindowsKeyBlocker } = require("windows-key-blocker")
 
 let mainWindow
 let isKioskMode = false
+let winKeyBlocker = null
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -53,86 +56,41 @@ function enableKioskMode() {
     mainWindow.setSkipTaskbar(true)
     mainWindow.setAutoHideMenuBar(true)
 
-    // This is the native Windows key blocker using low-level system hooks
-try {
-    const winKeyBlocker = require('./win-key-blocker');
-    winKeyBlocker.startBlockingWindowsKey();
-    console.log("Native Windows key blocker activated");
-} catch (error) {
-    console.error("Failed to load native Windows key blocker:", error);
-}
-
-// Platform-specific key blocking - keep as fallback
-if (process.platform === "win32") {
-    // Windows-specific key blocking
-    try {
-        // More aggressive Windows key blocking approach
-        // Block the Windows key itself (both left and right)
-        globalShortcut.register("Super", () => {
-            console.log("Windows key (Super) blocked");
-            return false;
+    // Инициализируем блокировщик Windows клавиши с полной конфигурацией
+    if (!winKeyBlocker) {
+        winKeyBlocker = initWindowsKeyBlocker({
+            useNativeHook: true,
+            useRegistry: true,
+            useAltTabBlocker: true,
+            useElectronShortcuts: true,
+            electronApp: app
         });
-        
-        // Block left Windows key specifically
-        globalShortcut.register("Super+L", () => {
-            console.log("Left Windows key blocked");
-            return false;
-        });
-        
-        // Block right Windows key specifically  
-        globalShortcut.register("Super+R", () => {
-            console.log("Right Windows key blocked");
-            return false;
-        });
-        
-        // Block Windows key as "Meta" (some systems use this identifier)
-        globalShortcut.register("Meta", () => {
-            console.log("Windows key (Meta) blocked");
-            return false;
-        });
-        
-        // Block LWin and RWin which are more specific identifiers
-        globalShortcut.register("LWin", () => {
-            console.log("LWin key blocked");
-            return false;
-        });
-        
-        globalShortcut.register("RWin", () => {
-            console.log("RWin key blocked");
-            return false;
-        });
-
-        // Block additional key combinations
-        // Block Alt+Tab
-        globalShortcut.register("Alt+Tab", () => {
-            console.log("Alt+Tab blocked");
-            return false;
-        });
-        
-        // Block Alt+Esc
-        globalShortcut.register("Alt+Escape", () => {
-            console.log("Alt+Escape blocked");
-            return false;
-        });
-        
-        // Block Ctrl+Alt+Delete (though this likely can't be fully blocked)
-        try {
-            globalShortcut.register("Ctrl+Alt+Delete", () => {
-                console.log("Attempted to block Ctrl+Alt+Delete");
-                return false;
-            });
-        } catch (error) {
-            console.log("Cannot block Ctrl+Alt+Delete: ", error);
-        }
-        
-        // Block Super key combinations (alternative naming)
-        globalShortcut.register("Super+D", () => false);
-        globalShortcut.register("Super+E", () => false);
-        globalShortcut.register("Super+F", () => false);
-        globalShortcut.register("Super+Tab", () => false);
-    } catch (error) {
-        console.error("Failed to register Windows key blockers:", error);
     }
+
+    // Активируем расширенный режим киоска (блокирует Windows клавишу и Alt+Tab)
+    if (process.platform === "win32") {
+        // Включаем все блокировки сразу
+        winKeyBlocker.enhanceKioskMode(true);
+        console.log("Windows key blocker activated in enhanced kiosk mode");
+        
+        // Добавляем дополнительную блокировку на уровне окна браузера
+        if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.on('before-input-event', (event, input) => {
+                // Block Windows key at browser level
+                if (input.key === 'Meta' || input.key === 'OS' || input.code === 'MetaLeft' || input.code === 'MetaRight') {
+                    event.preventDefault();
+                    console.log("Windows key blocked at browser level");
+                    return false;
+                }
+                
+                // Block Alt+Tab at browser level
+                if (input.altKey && input.key === 'Tab') {
+                    event.preventDefault();
+                    console.log("Alt+Tab blocked at browser level");
+                    return false;
+                }
+            });
+        }
     } else if (process.platform === "darwin") {
         // macOS-specific key blocking
         try {
@@ -145,84 +103,12 @@ if (process.platform === "win32") {
         }
     }
 
-    // Block additional touchpad/mouse related shortcuts
-    try {
-        globalShortcut.register("Alt+Esc", () => false)
-        globalShortcut.register("Ctrl+Esc", () => false)
-    } catch (error) {
-        console.error("Failed to register Esc combinations:", error)
-    }
-
     mainWindow.setClosable(false)
     mainWindow.setFullScreen(true)
     mainWindow.setMenuBarVisibility(false)
 
-    // Register all common shortcuts to prevent them from working
-    const shortcuts = ["Alt+F4", "Alt+Tab", "Ctrl+Esc", "Ctrl+Shift+Esc", "F11", "Esc", "Tab", "Ctrl+W", "Alt+Space"]
-
-    // Block all function keys F1-F12
-    for (let i = 1; i <= 12; i++) {
-        try {
-            globalShortcut.register(`F${i}`, () => {
-                console.log(`F${i} is blocked in kiosk mode`)
-                return false
-            })
-        } catch (error) {
-            console.log(`Failed to register F${i}:`, error)
-        }
-    }
-
-    // Block common shortcuts
-    shortcuts.forEach((shortcut) => {
-        try {
-            globalShortcut.register(shortcut, () => {
-                console.log(`${shortcut} is blocked in kiosk mode`)
-                return false
-            })
-        } catch (error) {
-            console.log(`Failed to register shortcut: ${shortcut}`, error)
-        }
-    })
-
-    // Block all Alt combinations
-    try {
-        globalShortcut.register("Alt+F4", () => false)
-    } catch (error) {
-        console.log("Failed to register Alt+F4:", error)
-    }
-
     // Notify renderer process
     mainWindow.webContents.send("kiosk-mode-changed", true)
-
-// Apply Windows-specific enhancements
-    if (process.platform === "win32") {
-        enhanceWindowsKioskMode(true)
-        
-        // Import the new function directly to ensure it's called
-        const { blockWindowsKeyStartMenu } = require("./kiosk-helper.js")
-        blockWindowsKeyStartMenu()
-        
-        // Block Alt+Tab switching
-        const { blockAltTabSwitching } = require('./altTabBlocker.js')
-        blockAltTabSwitching()
-        
-        // Add renderer process listener to respond to key events
-        mainWindow.webContents.on('before-input-event', (event, input) => {
-            // Block Windows key at browser level
-            if (input.key === 'Meta' || input.key === 'OS' || input.code === 'MetaLeft' || input.code === 'MetaRight') {
-                event.preventDefault();
-                console.log("Windows key blocked at browser level");
-                return false;
-            }
-            
-            // Block Alt+Tab at browser level
-            if (input.altKey && input.key === 'Tab') {
-                event.preventDefault();
-                console.log("Alt+Tab blocked at browser level");
-                return false;
-            }
-        });
-    }
 }
 
 // Disable kiosk mode
@@ -238,25 +124,10 @@ function disableKioskMode() {
     mainWindow.setFullScreen(false)
     mainWindow.setMenuBarVisibility(true)
 
-    // Restore Windows settings
-    if (process.platform === "win32") {
-        enhanceWindowsKioskMode(false)
-        
-        // Restore Alt+Tab functionality
-        try {
-            const { restoreAltTabSwitching } = require('./altTabBlocker.js')
-            restoreAltTabSwitching()
-        } catch (error) {
-            console.error("Failed to restore Alt+Tab functionality:", error)
-        }
-        
-        // Restore Windows key functionality
-        try {
-            const { stopBlockingWindowsKey } = require('./win-key-blocker')
-            stopBlockingWindowsKey()
-        } catch (error) {
-            console.error("Failed to restore Windows key functionality:", error)
-        }
+    // Отключаем блокировку Windows клавиши
+    if (process.platform === "win32" && winKeyBlocker) {
+        winKeyBlocker.enhanceKioskMode(false);
+        console.log("Windows key blocker deactivated");
     }
 
     // Unregister all shortcuts
@@ -295,6 +166,11 @@ app.on("window-all-closed", () => {
 // Clean up when app is quitting
 app.on("will-quit", () => {
     globalShortcut.unregisterAll()
+    
+    // Также отключаем блокировку Windows клавиши при выходе
+    if (process.platform === "win32" && winKeyBlocker) {
+        winKeyBlocker.disable();
+    }
 })
 
 // Prevent the app from exiting when in kiosk mode
