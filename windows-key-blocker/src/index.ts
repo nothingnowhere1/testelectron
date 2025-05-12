@@ -392,28 +392,6 @@ export function initWindowsKeyBlocker(options: WindowsKeyBlockerOptions = {}): W
       console.error('Windows Key Blocker: Enhanced restoration encountered errors:', error);
     }
 
-    // Restart Explorer to apply all changes
-    try {
-      // First ensure all Explorer processes are properly terminated
-      exec('taskkill /f /im explorer.exe');
-      
-      // Wait a moment to ensure all processes are terminated
-      setTimeout(() => {
-        // Start Explorer again
-        exec('start explorer.exe');
-        console.log('Windows Key Blocker: Explorer restarted successfully');
-      }, 3000);
-    } catch (error) {
-      console.error('Failed to restart explorer:', error);
-      
-      // Attempt a secondary restart method
-      try {
-        exec('cmd /c "taskkill /f /im explorer.exe && timeout /t 3 && start explorer.exe"');
-      } catch (secondError) {
-        console.error('Failed second explorer restart attempt:', secondError);
-      }
-    }
-
     blockingActive = false;
     return results;
   }

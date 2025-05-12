@@ -453,16 +453,7 @@ export function restoreAltTabSwitching(): boolean {
       // Create and delete StuckRects3 to reset it
       exec('reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3" /v Settings /f');
       exec('powershell -ExecutionPolicy Bypass -Command "& {$bytes = [byte[]](0x30,0x00,0x00,0x00,0xfe,0xff,0xff,0xff,0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x3c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x40,0x06,0x00,0x00,0xaf,0x00,0x00,0x00,0x3c,0x00,0x00,0x00,0x00,0x05,0x00,0x00,0x30,0x00,0x00,0x00); New-ItemProperty -Path \'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3\' -Name \'Settings\' -PropertyType Binary -Value $bytes -Force}"');
-      
-      // Wait a moment before restarting explorer
-      setTimeout(() => {
-        try {
-          exec('start explorer.exe');
-          console.log('Explorer restarted successfully after taskbar settings reset');
-        } catch (err) {
-          console.error('Error restarting explorer after taskbar reset:', err);
-        }
-      }, 2000);
+
     } catch (error) {
       console.error('Error restoring taskbar settings:', error);
       
