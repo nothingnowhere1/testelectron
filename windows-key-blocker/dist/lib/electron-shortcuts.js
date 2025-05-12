@@ -7,9 +7,7 @@
  * all system shortcuts.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.registerElectronShortcuts = registerElectronShortcuts;
-exports.unregisterElectronShortcuts = unregisterElectronShortcuts;
-exports.addBrowserWindowKeyHandlers = addBrowserWindowKeyHandlers;
+exports.addBrowserWindowKeyHandlers = exports.unregisterElectronShortcuts = exports.registerElectronShortcuts = void 0;
 /**
  * Register global shortcuts to block various key combinations in Electron
  * @param electronApp The Electron app instance
@@ -123,6 +121,7 @@ function registerElectronShortcuts(electronApp) {
     };
     return registerShortcuts();
 }
+exports.registerElectronShortcuts = registerElectronShortcuts;
 /**
  * Unregister all global shortcuts
  * @param electronApp The Electron app instance
@@ -144,6 +143,7 @@ function unregisterElectronShortcuts(electronApp) {
         return false;
     }
 }
+exports.unregisterElectronShortcuts = unregisterElectronShortcuts;
 /**
  * Add BrowserWindow event handlers to block key combinations
  * @param browserWindow The Electron BrowserWindow instance
@@ -178,3 +178,4 @@ function addBrowserWindowKeyHandlers(browserWindow) {
         return false;
     }
 }
+exports.addBrowserWindowKeyHandlers = addBrowserWindowKeyHandlers;

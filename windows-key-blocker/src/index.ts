@@ -289,7 +289,6 @@ export function initWindowsKeyBlocker(options: WindowsKeyBlockerOptions = {}): W
     if (process.platform !== 'win32') {
       return results;
     }
-
     console.log('Windows Key Blocker: Starting comprehensive restoration of all functionality');
     
     // First attempt: Standard restoration

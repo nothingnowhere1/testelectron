@@ -46,6 +46,12 @@ export interface WindowsKeyBlocker {
     disable: () => BlockerResults;
     /** Enable or disable full kiosk mode with all enhancements */
     enhanceKioskMode: (enable: boolean) => boolean;
+    /** Check if blocking is currently active */
+    isActive: () => boolean;
+    /** Create a system restore script for emergency use */
+    createEmergencyRestoreScript: () => string;
+    /** Force a complete system restore even if normal disable failed */
+    forceSystemRestore: () => Promise<boolean>;
 }
 /**
  * Initialize Windows key blocking with all available methods

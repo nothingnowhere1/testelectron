@@ -6,8 +6,7 @@
  * blocking the Windows key and other system shortcuts.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.startBlockingWindowsKey = startBlockingWindowsKey;
-exports.stopBlockingWindowsKey = stopBlockingWindowsKey;
+exports.stopBlockingWindowsKey = exports.startBlockingWindowsKey = void 0;
 let nativeBlocker = null;
 /**
  * Attempt to load the native addon with proper error handling
@@ -37,6 +36,7 @@ function startBlockingWindowsKey() {
         return false;
     }
 }
+exports.startBlockingWindowsKey = startBlockingWindowsKey;
 /**
  * Stop blocking Windows key
  * @returns True if successful, false otherwise
@@ -49,3 +49,4 @@ function stopBlockingWindowsKey() {
     }
     return false;
 }
+exports.stopBlockingWindowsKey = stopBlockingWindowsKey;

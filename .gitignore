@@ -9,3 +9,7 @@ yarn-error.log*
 .pnp.js
 
 .vscode/*
+/windows-key-blocker/node_modules/
+/windows-key-blocker/build/
+/windows-key-blocker/dist/
+/windows-key-blocker/scripts/

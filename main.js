@@ -38,25 +38,13 @@ function enableKioskMode() {
     if (!mainWindow) return
 
     isKioskMode = true
-
-    // Set window properties for kiosk mode
     mainWindow.setKiosk(true)
-
-    // Set window bounds to cover the entire screen including taskbar
     const primaryDisplay = screen.getPrimaryDisplay()
-
-    // Set window to cover entire screen including taskbar
     mainWindow.setPosition(0, 0)
     mainWindow.setSize(primaryDisplay.bounds.width, primaryDisplay.bounds.height)
-
-    // Ensure window is above taskbar
     mainWindow.setAlwaysOnTop(true, "screen-saver")
-
-    // Additional measures to prevent taskbar access
     mainWindow.setSkipTaskbar(true)
     mainWindow.setAutoHideMenuBar(true)
-
-    // Инициализируем блокировщик Windows клавиши с полной конфигурацией
     if (!winKeyBlocker) {
         winKeyBlocker = initWindowsKeyBlocker({
             useNativeHook: true,
@@ -67,40 +55,15 @@ function enableKioskMode() {
         });
     }
 
-    // Активируем расширенный режим киоска (блокирует Windows клавишу и Alt+Tab)
     if (process.platform === "win32") {
         try {
-            // Создаем скрипт экстренного восстановления перед включением блокировки
             winKeyBlocker.createEmergencyRestoreScript();
-            
+
             // Включаем все блокировки сразу
-            winKeyBlocker.enhanceKioskMode(true);
-            console.log("Windows key blocker activated in enhanced kiosk mode");
-            
-            // Добавляем дополнительную блокировку на уровне окна браузера
-            if (mainWindow && mainWindow.webContents) {
-                mainWindow.webContents.on('before-input-event', (event, input) => {
-                    // Block Windows key at browser level
-                    if (input.key === 'Meta' || input.key === 'OS' || input.code === 'MetaLeft' || input.code === 'MetaRight') {
-                        event.preventDefault();
-                        console.log("Windows key blocked at browser level");
-                        return false;
-                    }
-                    
-                    // Block Alt+Tab at browser level
-                    if (input.altKey && input.key === 'Tab') {
-                        event.preventDefault();
-                        console.log("Alt+Tab blocked at browser level");
-                        return false;
-                    }
-                });
-            }
-        } catch (error) {
-            console.error("Failed to enable kiosk mode:", error);
-            dialog.showErrorBox(
-                "Ошибка активации режима киоска", 
-                "Произошла ошибка при активации режима киоска. Некоторые функции могут быть недоступны."
-            );
+            winKeyBlocker.enable();
+        }
+        catch (error) {
+            console.error("Failed to enable Windows key blocker:", error)
         }
     } else if (process.platform === "darwin") {
         // macOS-specific key blocking
@@ -139,21 +102,7 @@ function disableKioskMode() {
     if (process.platform === "win32" && winKeyBlocker) {
         try {
             // Сначала пробуем стандартное отключение
-            const result = winKeyBlocker.enhanceKioskMode(false);
-            console.log("Windows key blocker deactivation result:", result);
-            
-            // Если после стандартного отключения блокировка все еще активна,
-            // запускаем экстренное восстановление системы
-            if (winKeyBlocker.isActive()) {
-                console.log("Forcing system restore because blocker is still active");
-                winKeyBlocker.forceSystemRestore()
-                    .then(success => {
-                        console.log("Emergency system restore completed with result:", success);
-                    })
-                    .catch(error => {
-                        console.error("Error during emergency system restore:", error);
-                    });
-            }
+            const result = winKeyBlocker.disable();
         } catch (error) {
             console.error("Failed to disable kiosk mode:", error);
             console.log("Attempting emergency system restore...");

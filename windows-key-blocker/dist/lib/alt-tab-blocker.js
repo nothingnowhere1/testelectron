@@ -21,29 +21,21 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.blockAltTabSwitching = blockAltTabSwitching;
-exports.restoreAltTabSwitching = restoreAltTabSwitching;
+exports.restoreAltTabSwitching = exports.blockAltTabSwitching = void 0;
 const child_process_1 = require("child_process");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
+// Отслеживание запущенных процессов для корректной очистки
+let powershellProcessId = null;
+let backupCreated = false;
 /**
  * Uses additional techniques to prevent Alt+Tab switching in Windows
  * @returns True if the operation was successful
@@ -52,6 +44,8 @@ function blockAltTabSwitching() {
     if (process.platform !== 'win32')
         return false;
     try {
+        // Создаем резервную копию настроек перед модификацией
+        createRegistryBackup();
         // Create a VBS script to disable Alt+Tab via registry
         createVbsScript();
         // Create a PowerShell script to further block Alt+Tab
@@ -61,6 +55,29 @@ function blockAltTabSwitching() {
     catch (error) {
         console.error('Error setting up Alt+Tab blocker:', error);
         return false;
+    }
+}
+exports.blockAltTabSwitching = blockAltTabSwitching;
+/**
+ * Создает резервную копию настроек реестра
+ */
+function createRegistryBackup() {
+    if (backupCreated)
+        return;
+    try {
+        // Создаем директорию для резервных копий
+        const backupDir = path.join(process.env.TEMP || '.', 'WindowsKeyBlockerBackup');
+        if (!fs.existsSync(backupDir)) {
+            fs.mkdirSync(backupDir, { recursive: true });
+        }
+        // Запускаем экспорт реестра для ключевых веток
+        (0, child_process_1.exec)('reg export "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" "' +
+            path.join(backupDir, 'Explorer_Advanced.reg') + '" /y');
+        backupCreated = true;
+        console.log('Registry backup created');
+    }
+    catch (error) {
+        console.error('Failed to create registry backup:', error);
     }
 }
 /**
@@ -75,8 +92,20 @@ Dim WshShell
 Set WshShell = CreateObject("WScript.Shell")
 
 ' Save original settings first (safer restoration)
-WshShell.RegWrite "HKCU\\Software\\KioskAppBackup\\TaskbarSmallIcons", WshShell.RegRead("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarSmallIcons"), "REG_DWORD"
 On Error Resume Next
+' Create backup directory
+Dim fso, backupDir
+Set fso = CreateObject("Scripting.FileSystemObject")
+backupDir = WshShell.ExpandEnvironmentStrings("%TEMP%") & "\\WindowsKeyBlockerBackup"
+If Not fso.FolderExists(backupDir) Then
+    fso.CreateFolder(backupDir)
+End If
+
+' Backup important settings to files for safer restoration
+WshShell.Run "reg export ""HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced"" """ & backupDir & "\\Explorer_Advanced_VBS.reg"" /y", 0, True
+
+' Save specific values
+WshShell.RegWrite "HKCU\\Software\\KioskAppBackup\\TaskbarSmallIcons", WshShell.RegRead("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarSmallIcons"), "REG_DWORD"
 WshShell.RegWrite "HKCU\\Software\\KioskAppBackup\\IconsOnly", WshShell.RegRead("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\IconsOnly"), "REG_DWORD"
 WshShell.RegWrite "HKCU\\Software\\KioskAppBackup\\TaskbarAnimations", WshShell.RegRead("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarAnimations"), "REG_DWORD"
 On Error Goto 0
@@ -92,7 +121,27 @@ WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\
 ' WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarSmallIcons", 1, "REG_DWORD"
 ' WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\IconsOnly", 1, "REG_DWORD"
 
-WScript.Echo "Alt+Tab blocking registry changes applied"
+' Create a restore script for emergency use
+Dim restoreFile
+restoreFile = backupDir & "\\RestoreAltTab.bat"
+Set fso = CreateObject("Scripting.FileSystemObject")
+Dim ts
+Set ts = fso.CreateTextFile(restoreFile, True)
+ts.WriteLine "@echo off"
+ts.WriteLine "echo Restoring Alt+Tab functionality..."
+ts.WriteLine "reg delete ""HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\DisallowShaking"" /f"
+ts.WriteLine "reg delete ""HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\ExtendedUIHoverTime"" /f"
+ts.WriteLine "reg delete ""HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarNoThumbnail"" /f"
+ts.WriteLine "reg delete ""HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\ListviewAlphaSelect"" /f"
+ts.WriteLine "taskkill /f /im powershell.exe /fi ""WINDOWTITLE eq *BlockAltTab*"""
+ts.WriteLine "echo Restarting explorer..."
+ts.WriteLine "taskkill /f /im explorer.exe"
+ts.WriteLine "timeout /t 2"
+ts.WriteLine "start explorer.exe"
+ts.WriteLine "echo Alt+Tab functionality restored."
+ts.Close
+
+WScript.Echo "Alt+Tab blocking registry changes applied. Emergency restore script created at: " & restoreFile
   `;
     const scriptsDir = path.join(__dirname, '..', '..', 'scripts');
     const vbsPath = path.join(scriptsDir, 'DisableAltTab.vbs');
@@ -116,11 +165,16 @@ WScript.Echo "Alt+Tab blocking registry changes applied"
 function createPowershellBlocker() {
     const psContent = `
 # PowerShell script to block Alt+Tab via keyboard hook
+$scriptTitle = "BlockAltTab"
+$host.UI.RawUI.WindowTitle = $scriptTitle
+
 Add-Type @"
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using System.IO;
+using System.Text;
 
 public class AltTabBlocker {
     private const int WH_KEYBOARD_LL = 13;
@@ -132,8 +186,23 @@ public class AltTabBlocker {
     private static LowLevelKeyboardProc _proc = HookCallback;
     private static IntPtr _hookID = IntPtr.Zero;
     private static bool _altKeyDown = false;
+    private static int _processId;
     
     public static void Main() {
+        _processId = Process.GetCurrentProcess().Id;
+        
+        // Write process ID to file for later termination
+        string tempPath = Path.GetTempPath();
+        string procIdFile = Path.Combine(tempPath, "WindowsKeyBlockerBackup", "AltTabBlockerPID.txt");
+        
+        // Create directory if it doesn't exist
+        Directory.CreateDirectory(Path.Combine(tempPath, "WindowsKeyBlockerBackup"));
+        
+        // Write process ID to file
+        File.WriteAllText(procIdFile, _processId.ToString());
+        
+        Console.WriteLine("Alt+Tab blocker started with Process ID: " + _processId);
+        
         _hookID = SetHook(_proc);
         Application.Run();
         UnhookWindowsHookEx(_hookID);
@@ -201,12 +270,26 @@ public class AltTabBlocker {
     }
     fs.writeFileSync(psPath, psContent);
     // Run the PowerShell script in hidden window
-    (0, child_process_1.exec)(`powershell -WindowStyle Hidden -ExecutionPolicy Bypass -File "${psPath}"`, (error) => {
+    (0, child_process_1.exec)(`powershell -WindowStyle Hidden -ExecutionPolicy Bypass -File "${psPath}"`, (error, stdout, stderr) => {
         if (error) {
             console.error(`Error executing PowerShell script: ${error}`);
             return;
         }
-        console.log('PowerShell Alt+Tab blocker started');
+        // Сохраняем ID процесса для последующего завершения
+        const backupDir = path.join(process.env.TEMP || '.', 'WindowsKeyBlockerBackup');
+        const pidFile = path.join(backupDir, 'AltTabBlockerPID.txt');
+        // Через секунду пытаемся прочитать файл с ID процесса
+        setTimeout(() => {
+            try {
+                if (fs.existsSync(pidFile)) {
+                    powershellProcessId = fs.readFileSync(pidFile, 'utf8').trim();
+                    console.log(`PowerShell Alt+Tab blocker started with PID: ${powershellProcessId}`);
+                }
+            }
+            catch (err) {
+                console.error('Error reading PowerShell process ID:', err);
+            }
+        }, 1000);
     });
 }
 /**
@@ -216,7 +299,30 @@ public class AltTabBlocker {
 function restoreAltTabSwitching() {
     if (process.platform !== 'win32')
         return false;
+    console.log('Executing enhanced Alt+Tab functionality restoration');
     try {
+        // Use additional methods for more thorough restoration
+        // Terminate all PowerShell blockers first
+        try {
+            // Terminate by PID if known
+            if (powershellProcessId) {
+                (0, child_process_1.exec)(`taskkill /F /PID ${powershellProcessId}`);
+                console.log(`PowerShell process ${powershellProcessId} terminated`);
+                powershellProcessId = null;
+            }
+            // Terminate by window title (multiple patterns)
+            (0, child_process_1.exec)('taskkill /f /im powershell.exe /fi "WINDOWTITLE eq BlockAltTab" 2>nul');
+            (0, child_process_1.exec)('taskkill /f /im powershell.exe /fi "WINDOWTITLE eq *BlockAltTab*" 2>nul');
+            // Terminate by command line content
+            (0, child_process_1.exec)('wmic process where "name=\'powershell.exe\' and commandline like \'%BlockAltTab%\'" call terminate 2>nul');
+            (0, child_process_1.exec)('wmic process where "name=\'powershell.exe\' and commandline like \'%AltTabBlocker%\'" call terminate 2>nul');
+            (0, child_process_1.exec)('wmic process where "name=\'powershell.exe\' and commandline like \'%windows-key-blocker%\'" call terminate 2>nul');
+            // Force unhook keyboard hooks using PowerShell
+            (0, child_process_1.exec)('powershell -Command "$sig = \'[DllImport(\\\"user32.dll\\\")] public static extern bool UnhookWindowsHookEx(IntPtr hHook);\' ; Add-Type -MemberDefinition $sig -Name Keyboard -Namespace Win32 ; try { [Win32.Keyboard]::UnhookWindowsHookEx([IntPtr]::Zero) } catch {}"');
+        }
+        catch (error) {
+            console.error('Error during PowerShell process termination:', error);
+        }
         // Create and run VBS script to restore original settings
         const restoreVbsContent = `
     ' RestoreSettings.vbs - Restores original Windows settings
@@ -265,6 +371,7 @@ function restoreAltTabSwitching() {
     ' Fix specific taskbar size issue
     WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarSizeMove", 1, "REG_DWORD"
     WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarSmallIcons", 0, "REG_DWORD"
+    WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarGlomLevel", 0, "REG_DWORD"
     
     ' Restart Explorer to apply changes
     On Error Resume Next
@@ -289,14 +396,33 @@ function restoreAltTabSwitching() {
                 console.log(`Restore output: ${stdout}`);
             }
         });
-        // Kill the PowerShell script
-        (0, child_process_1.exec)('taskkill /f /im powershell.exe /fi "WINDOWTITLE eq *BlockAltTab*"');
+        // Если у нас есть ID процесса PowerShell, завершаем его
+        if (powershellProcessId) {
+            try {
+                (0, child_process_1.exec)(`taskkill /F /PID ${powershellProcessId}`);
+                console.log(`PowerShell process ${powershellProcessId} terminated`);
+            }
+            catch (error) {
+                console.error(`Failed to terminate PowerShell process: ${error}`);
+            }
+            powershellProcessId = null;
+        }
+        else {
+            // Если ID не сохранён, завершаем по оконному заголовку
+            (0, child_process_1.exec)('taskkill /f /im powershell.exe /fi "WINDOWTITLE eq BlockAltTab"');
+        }
+        // Завершаем все процессы PowerShell, которые могут содержать BlockAltTab в командной строке
+        (0, child_process_1.exec)('wmic process where "name=\'powershell.exe\' and commandline like \'%BlockAltTab%\'" call terminate');
         // Apply additional fixes for taskbar size
         (0, child_process_1.exec)(`
       reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSizeMove /t REG_DWORD /d 1 /f
       reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSmallIcons /t REG_DWORD /d 0 /f
       reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarGlomLevel /t REG_DWORD /d 0 /f
     `);
+        // Восстанавливаем StuckRects3 для отображения панели задач
+        (0, child_process_1.exec)("powershell -command \"&{$p='HKCU:SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3';$v=(Get-ItemProperty -Path $p).Settings;$v[8]=2;&Set-ItemProperty -Path $p -Name Settings -Value $v;}\"");
+        // Безопасно перезапускаем проводник с таймаутом
+        (0, child_process_1.exec)("taskkill /f /im explorer.exe && timeout /t 2 && start explorer.exe");
         console.log('Alt+Tab functionality and taskbar appearance restored');
         return true;
     }
@@ -305,3 +431,4 @@ function restoreAltTabSwitching() {
         return false;
     }
 }
+exports.restoreAltTabSwitching = restoreAltTabSwitching;
