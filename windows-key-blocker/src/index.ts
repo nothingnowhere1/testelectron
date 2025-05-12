@@ -1,86 +1,68 @@
-/**
- * Windows Key Blocker Module
- * 
- * A comprehensive module for blocking Windows key and other system shortcuts
- * in kiosk-mode applications. Includes both high-level and low-level hooks.
- */
-
-import { 
-  startBlockingWindowsKey, 
-  stopBlockingWindowsKey 
+import {
+    startBlockingWindowsKey,
+    stopBlockingWindowsKey
 } from './lib/native-blocker';
 
-import { 
-  blockAltTabSwitching, 
-  restoreAltTabSwitching 
+import {
+    blockAltTabSwitching,
+    restoreAltTabSwitching
 } from './lib/alt-tab-blocker';
 
 import {
-  blockWindowsKeyRegistry,
-  restoreWindowsKeyRegistry,
-  enhanceKioskMode,
-  disableKioskMode
+    blockWindowsKeyRegistry,
+    restoreWindowsKeyRegistry,
+    enhanceKioskMode,
+    disableKioskMode
 } from './lib/registry-blocker';
 
 import {
-  registerElectronShortcuts,
-  unregisterElectronShortcuts,
-  addBrowserWindowKeyHandlers
+    registerElectronShortcuts,
+    unregisterElectronShortcuts,
+    addBrowserWindowKeyHandlers
 } from './lib/electron-shortcuts';
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { exec } from 'child_process';
+import {exec} from 'child_process';
 
-// Отслеживание текущего состояния блокировки
 let blockingActive = false;
 
-/**
- * Configuration options for Windows key blocker
- */
 export interface WindowsKeyBlockerOptions {
-  /** Use native C++ hook (most effective) */
-  useNativeHook?: boolean;
-  /** Use registry modifications */
-  useRegistry?: boolean;
-  /** Block Alt+Tab switching */
-  useAltTabBlocker?: boolean;
-  /** Use Electron global shortcuts */
-  useElectronShortcuts?: boolean;
-  /** Electron app instance for shortcuts */
-  electronApp?: any;
+    /** Use native C++ hook (most effective) */
+    useNativeHook?: boolean;
+    /** Use registry modifications */
+    useRegistry?: boolean;
+    /** Block Alt+Tab switching */
+    useAltTabBlocker?: boolean;
+    /** Use Electron global shortcuts */
+    useElectronShortcuts?: boolean;
+    /** Electron app instance for shortcuts */
+    electronApp?: any;
 }
 
 /**
  * Result object for blocker operations
  */
 export interface BlockerResults {
-  /** Status of native hook operation */
-  nativeHook: boolean;
-  /** Status of registry modification operation */
-  registry: boolean;
-  /** Status of Alt+Tab blocker operation */
-  altTabBlocker: boolean;
-  /** Status of Electron shortcuts operation */
-  electronShortcuts: boolean;
+    nativeHook: boolean;
+    registry: boolean;
+    altTabBlocker: boolean;
+    electronShortcuts: boolean;
 }
 
-/**
- * Windows key blocker control interface
- */
 export interface WindowsKeyBlocker {
-  /** Enable Windows key blocking */
-  enable: () => BlockerResults;
-  /** Disable Windows key blocking */
-  disable: () => BlockerResults;
-  /** Enable or disable full kiosk mode with all enhancements */
-  enhanceKioskMode: (enable: boolean) => boolean;
-  /** Check if blocking is currently active */
-  isActive: () => boolean;
-  /** Create a system restore script for emergency use */
-  createEmergencyRestoreScript: () => string;
-  /** Force a complete system restore even if normal disable failed */
-  forceSystemRestore: () => Promise<boolean>;
+    /** Enable Windows key blocking */
+    enable: () => BlockerResults;
+    /** Disable Windows key blocking */
+    disable: () => BlockerResults;
+    /** Enable or disable full kiosk mode with all enhancements */
+    enhanceKioskMode: (enable: boolean) => boolean;
+    /** Check if blocking is currently active */
+    isActive: () => boolean;
+    /** Create a system restore script for emergency use */
+    createEmergencyRestoreScript: () => string;
+    /** Force a complete system restore even if normal disable failed */
+    forceSystemRestore: () => Promise<boolean>;
 }
 
 /**
@@ -88,7 +70,7 @@ export interface WindowsKeyBlocker {
  * @returns Path to the created script
  */
 function createEmergencyRestoreScript(): string {
-  const restoreScript = `@echo off
+    const restoreScript = `@echo off
 echo Экстренное восстановление функциональности Windows...
 
 REM Завершаем все процессы PowerShell, связанные с блокировкой Alt+Tab
@@ -152,23 +134,21 @@ echo Если панель задач все еще не видна, перез�
 pause
 `;
 
-  try {
-    // Создаем директорию для скриптов
-    const scriptsDir = path.join(__dirname, '..', 'scripts');
-    if (!fs.existsSync(scriptsDir)) {
-      fs.mkdirSync(scriptsDir, { recursive: true });
+    try {
+        const scriptsDir = path.join(__dirname, '..', 'scripts');
+        if (!fs.existsSync(scriptsDir)) {
+            fs.mkdirSync(scriptsDir, {recursive: true});
+        }
+
+        const restoreScriptPath = path.join(scriptsDir, 'EmergencySystemRestore.bat');
+        fs.writeFileSync(restoreScriptPath, restoreScript);
+
+        console.log(`Emergency restore script created at: ${restoreScriptPath}`);
+        return restoreScriptPath;
+    } catch (error) {
+        console.error('Failed to create emergency restore script:', error);
+        return '';
     }
-    
-    // Сохраняем скрипт восстановления
-    const restoreScriptPath = path.join(scriptsDir, 'EmergencySystemRestore.bat');
-    fs.writeFileSync(restoreScriptPath, restoreScript);
-    
-    console.log(`Emergency restore script created at: ${restoreScriptPath}`);
-    return restoreScriptPath;
-  } catch (error) {
-    console.error('Failed to create emergency restore script:', error);
-    return '';
-  }
 }
 
 /**
@@ -176,30 +156,30 @@ pause
  * @returns Promise that resolves to true if successful
  */
 async function forceSystemRestore(): Promise<boolean> {
-  return new Promise((resolve) => {
-    const restoreScriptPath = createEmergencyRestoreScript();
-    
-    if (!restoreScriptPath) {
-      console.error('Failed to create emergency restore script');
-      resolve(false);
-      return;
-    }
-    
-    console.log('Executing emergency system restore...');
-    
-    // Здесь используем отдельный процесс без ожидания завершения,
-    // чтобы не блокировать основной поток
-    exec(`start cmd /c "${restoreScriptPath}"`, (error) => {
-      if (error) {
-        console.error('Failed to execute emergency restore script:', error);
-        resolve(false);
-      } else {
-        console.log('Emergency restore script executed successfully');
-        blockingActive = false;
-        resolve(true);
-      }
+    return new Promise((resolve) => {
+        const restoreScriptPath = createEmergencyRestoreScript();
+
+        if (!restoreScriptPath) {
+            console.error('Failed to create emergency restore script');
+            resolve(false);
+            return;
+        }
+
+        console.log('Executing emergency system restore...');
+
+        // Здесь используем отдельный процесс без ожидания завершения,
+        // чтобы не блокировать основной поток
+        exec(`start cmd /c "${restoreScriptPath}"`, (error) => {
+            if (error) {
+                console.error('Failed to execute emergency restore script:', error);
+                resolve(false);
+            } else {
+                console.log('Emergency restore script executed successfully');
+                blockingActive = false;
+                resolve(true);
+            }
+        });
     });
-  });
 }
 
 /**
@@ -208,268 +188,268 @@ async function forceSystemRestore(): Promise<boolean> {
  * @returns Control methods for the blocker
  */
 export function initWindowsKeyBlocker(options: WindowsKeyBlockerOptions = {}): WindowsKeyBlocker {
-  const defaultOptions: WindowsKeyBlockerOptions = {
-    useNativeHook: true,
-    useRegistry: true,
-    useAltTabBlocker: true,
-    useElectronShortcuts: true,
-    electronApp: null
-  };
-
-  const config = { ...defaultOptions, ...options };
-  
-  // Создаем скрипт экстренного восстановления при инициализации
-  createEmergencyRestoreScript();
-  
-  function enableBlocker(): BlockerResults {
-    let results: BlockerResults = {
-      nativeHook: false,
-      registry: false,
-      altTabBlocker: false,
-      electronShortcuts: false
+    const defaultOptions: WindowsKeyBlockerOptions = {
+        useNativeHook: true,
+        useRegistry: true,
+        useAltTabBlocker: true,
+        useElectronShortcuts: true,
+        electronApp: null
     };
 
-    if (process.platform !== 'win32') {
-      console.log('Windows Key Blocker: Not running on Windows, some features disabled');
-      return results;
+    const config = {...defaultOptions, ...options};
+
+    // Создаем скрипт экстренного восстановления при инициализации
+    createEmergencyRestoreScript();
+
+    function enableBlocker(): BlockerResults {
+        let results: BlockerResults = {
+            nativeHook: false,
+            registry: false,
+            altTabBlocker: false,
+            electronShortcuts: false
+        };
+
+        if (process.platform !== 'win32') {
+            console.log('Windows Key Blocker: Not running on Windows, some features disabled');
+            return results;
+        }
+
+        if (config.useNativeHook) {
+            try {
+                results.nativeHook = startBlockingWindowsKey();
+                console.log('Windows Key Blocker: Native hook ' +
+                    (results.nativeHook ? 'started' : 'failed'));
+            } catch (err) {
+                console.error('Windows Key Blocker: Failed to start native hook', err);
+            }
+        }
+
+        if (config.useRegistry) {
+            try {
+                blockWindowsKeyRegistry();
+                results.registry = true;
+                console.log('Windows Key Blocker: Registry modifications applied');
+            } catch (err) {
+                console.error('Windows Key Blocker: Failed to apply registry modifications', err);
+            }
+        }
+
+        if (config.useAltTabBlocker) {
+            try {
+                blockAltTabSwitching();
+                results.altTabBlocker = true;
+                console.log('Windows Key Blocker: Alt+Tab blocker started');
+            } catch (err) {
+                console.error('Windows Key Blocker: Failed to start Alt+Tab blocker', err);
+            }
+        }
+
+        if (config.useElectronShortcuts && config.electronApp) {
+            try {
+                registerElectronShortcuts(config.electronApp);
+                results.electronShortcuts = true;
+                console.log('Windows Key Blocker: Electron shortcuts registered');
+            } catch (err) {
+                console.error('Windows Key Blocker: Failed to register Electron shortcuts', err);
+            }
+        }
+
+        blockingActive = true;
+        return results;
     }
 
-    if (config.useNativeHook) {
-      try {
-        results.nativeHook = startBlockingWindowsKey();
-        console.log('Windows Key Blocker: Native hook ' + 
-          (results.nativeHook ? 'started' : 'failed'));
-      } catch (err) {
-        console.error('Windows Key Blocker: Failed to start native hook', err);
-      }
+    function disableBlocker(): BlockerResults {
+        let results: BlockerResults = {
+            nativeHook: false,
+            registry: false,
+            altTabBlocker: false,
+            electronShortcuts: false
+        };
+
+        if (process.platform !== 'win32') {
+            return results;
+        }
+        console.log('Windows Key Blocker: Starting comprehensive restoration of all functionality');
+
+        // First attempt: Standard restoration
+        if (config.useNativeHook) {
+            try {
+                results.nativeHook = stopBlockingWindowsKey();
+                console.log('Windows Key Blocker: Native hook ' +
+                    (results.nativeHook ? 'stopped' : 'was not running'));
+            } catch (err) {
+                console.error('Windows Key Blocker: Failed to stop native hook', err);
+            }
+        }
+
+        if (config.useRegistry) {
+            try {
+                restoreWindowsKeyRegistry();
+                results.registry = true;
+                console.log('Windows Key Blocker: Registry modifications removed');
+            } catch (err) {
+                console.error('Windows Key Blocker: Failed to remove registry modifications', err);
+            }
+        }
+
+        if (config.useAltTabBlocker) {
+            try {
+                restoreAltTabSwitching();
+                results.altTabBlocker = true;
+                console.log('Windows Key Blocker: Alt+Tab functionality restored');
+            } catch (err) {
+                console.error('Windows Key Blocker: Failed to restore Alt+Tab functionality', err);
+            }
+        }
+
+        if (config.useElectronShortcuts && config.electronApp) {
+            try {
+                unregisterElectronShortcuts(config.electronApp);
+                results.electronShortcuts = true;
+                console.log('Windows Key Blocker: Electron shortcuts unregistered');
+            } catch (err) {
+                console.error('Windows Key Blocker: Failed to unregister Electron shortcuts', err);
+            }
+        }
+
+        // Second attempt: Enhanced restoration for all functionality
+        try {
+            // Kill all blocker processes
+            exec('taskkill /f /im powershell.exe /fi "WINDOWTITLE eq *BlockAltTab*" 2>nul');
+            exec('taskkill /f /im powershell.exe /fi "WINDOWTITLE eq BlockAltTab" 2>nul');
+            exec('wmic process where "name=\'powershell.exe\' and commandline like \'%BlockAltTab%\'" call terminate 2>nul');
+            exec('wmic process where "name=\'powershell.exe\' and commandline like \'%AltTabBlocker%\'" call terminate 2>nul');
+            exec('wmic process where "name=\'powershell.exe\' and commandline like \'%windows-key-blocker%\'" call terminate 2>nul');
+
+            // Reset keyboard hooks
+            exec('powershell -Command "$sig = \'[DllImport(\\\"user32.dll\\\")] public static extern bool UnhookWindowsHookEx(IntPtr hHook);\' ; Add-Type -MemberDefinition $sig -Name Keyboard -Namespace Win32 ; try { [Win32.Keyboard]::UnhookWindowsHookEx([IntPtr]::Zero) } catch {}"');
+
+            // Reset StuckRects3 settings for taskbar
+            exec('powershell -Command "$p=\'HKCU:SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3\'; if (Test-Path $p) { $v=(Get-ItemProperty -Path $p).Settings; $v[8]=2; Set-ItemProperty -Path $p -Name Settings -Value $v; }"');
+
+            // Reset Windows input settings
+            exec('reg add "HKCU\\Control Panel\\Accessibility\\Keyboard Response" /v "Flags" /t REG_DWORD /d 0 /f');
+            exec('reg add "HKCU\\Control Panel\\Accessibility\\ToggleKeys" /v "Flags" /t REG_DWORD /d 0 /f');
+            exec('reg add "HKCU\\Control Panel\\Accessibility\\StickyKeys" /v "Flags" /t REG_DWORD /d 0 /f');
+            exec('reg add "HKCU\\Control Panel\\Accessibility\\FilterKeys" /v "Flags" /t REG_DWORD /d 0 /f');
+
+            // Fix keyboard scan codes
+            exec('reg delete "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout" /v "Scancode Map" /f 2>nul');
+
+            // Remove settings backup
+            exec('reg delete "HKCU\\Software\\KioskAppBackup" /f 2>nul');
+
+            // Enhanced taskbar restoration
+            try {
+                // 1. Delete existing StuckRects3 settings
+                exec('reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3" /v Settings /f');
+
+                // 2. Set taskbar settings to default values
+                exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSizeMove /t REG_DWORD /d 1 /f');
+                exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSmallIcons /t REG_DWORD /d 0 /f');
+                exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarGlomLevel /t REG_DWORD /d 0 /f');
+                exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v AutoHideTaskBar /t REG_DWORD /d 0 /f');
+
+                // 3. Recreate StuckRects3 with proper values using PowerShell
+                exec('powershell -ExecutionPolicy Bypass -Command "& {$bytes = [byte[]](0x30,0x00,0x00,0x00,0xfe,0xff,0xff,0xff,0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x3c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x40,0x06,0x00,0x00,0xaf,0x00,0x00,0x00,0x3c,0x00,0x00,0x00,0x00,0x05,0x00,0x00,0x30,0x00,0x00,0x00); New-ItemProperty -Path \'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3\' -Name \'Settings\' -PropertyType Binary -Value $bytes -Force}"');
+
+                // 4. Remove any policy settings that might hide the taskbar
+                exec('reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer" /v NoTrayItemsDisplay /f');
+                exec('reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer" /v NoTaskbarItemsDisplay /f');
+
+                console.log('Windows Key Blocker: Enhanced taskbar settings restored');
+            } catch (error) {
+                console.error('Error restoring taskbar settings:', error);
+            }
+
+            // Restore touchpad gestures
+            exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v EdgeSwipeEnabled /t REG_DWORD /d 1 /f');
+            exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v ThreeFingerSlideEnabled /t REG_DWORD /d 1 /f');
+            exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v FourFingerSlideEnabled /t REG_DWORD /d 1 /f');
+
+            console.log('Windows Key Blocker: Enhanced restoration completed');
+        } catch (error) {
+            console.error('Windows Key Blocker: Enhanced restoration encountered errors:', error);
+        }
+
+        // Restart Explorer to apply all changes
+        try {
+            // First ensure all Explorer processes are properly terminated
+            exec('taskkill /f /im explorer.exe');
+
+            // Wait a moment to ensure all processes are terminated
+            setTimeout(() => {
+                // Start Explorer again
+                exec('start explorer.exe');
+                console.log('Windows Key Blocker: Explorer restarted successfully');
+            }, 3000);
+        } catch (error) {
+            console.error('Failed to restart explorer:', error);
+
+            // Attempt a secondary restart method
+            try {
+                exec('cmd /c "taskkill /f /im explorer.exe && timeout /t 3 && start explorer.exe"');
+            } catch (secondError) {
+                console.error('Failed second explorer restart attempt:', secondError);
+            }
+        }
+
+        blockingActive = false;
+        return results;
     }
 
-    if (config.useRegistry) {
-      try {
-        blockWindowsKeyRegistry();
-        results.registry = true;
-        console.log('Windows Key Blocker: Registry modifications applied');
-      } catch (err) {
-        console.error('Windows Key Blocker: Failed to apply registry modifications', err);
-      }
+    function enhanceFullKioskMode(enable: boolean): boolean {
+        if (process.platform !== 'win32') return false;
+
+        if (enable) {
+            enableBlocker();
+            enhanceKioskMode(true);
+            blockingActive = true;
+            return true;
+        } else {
+            disableBlocker();
+            disableKioskMode(false);
+            blockingActive = false;
+            return true;
+        }
     }
 
-    if (config.useAltTabBlocker) {
-      try {
-        blockAltTabSwitching();
-        results.altTabBlocker = true;
-        console.log('Windows Key Blocker: Alt+Tab blocker started');
-      } catch (err) {
-        console.error('Windows Key Blocker: Failed to start Alt+Tab blocker', err);
-      }
+    function isActive(): boolean {
+        return blockingActive;
     }
 
-    if (config.useElectronShortcuts && config.electronApp) {
-      try {
-        registerElectronShortcuts(config.electronApp);
-        results.electronShortcuts = true;
-        console.log('Windows Key Blocker: Electron shortcuts registered');
-      } catch (err) {
-        console.error('Windows Key Blocker: Failed to register Electron shortcuts', err);
-      }
-    }
-
-    blockingActive = true;
-    return results;
-  }
-
-  function disableBlocker(): BlockerResults {
-    let results: BlockerResults = {
-      nativeHook: false,
-      registry: false,
-      altTabBlocker: false,
-      electronShortcuts: false
+    return {
+        enable: enableBlocker,
+        disable: disableBlocker,
+        enhanceKioskMode: enhanceFullKioskMode,
+        isActive,
+        createEmergencyRestoreScript,
+        forceSystemRestore
     };
-
-    if (process.platform !== 'win32') {
-      return results;
-    }
-    console.log('Windows Key Blocker: Starting comprehensive restoration of all functionality');
-    
-    // First attempt: Standard restoration
-    if (config.useNativeHook) {
-      try {
-        results.nativeHook = stopBlockingWindowsKey();
-        console.log('Windows Key Blocker: Native hook ' + 
-          (results.nativeHook ? 'stopped' : 'was not running'));
-      } catch (err) {
-        console.error('Windows Key Blocker: Failed to stop native hook', err);
-      }
-    }
-
-    if (config.useRegistry) {
-      try {
-        restoreWindowsKeyRegistry();
-        results.registry = true;
-        console.log('Windows Key Blocker: Registry modifications removed');
-      } catch (err) {
-        console.error('Windows Key Blocker: Failed to remove registry modifications', err);
-      }
-    }
-
-    if (config.useAltTabBlocker) {
-      try {
-        restoreAltTabSwitching();
-        results.altTabBlocker = true;
-        console.log('Windows Key Blocker: Alt+Tab functionality restored');
-      } catch (err) {
-        console.error('Windows Key Blocker: Failed to restore Alt+Tab functionality', err);
-      }
-    }
-
-    if (config.useElectronShortcuts && config.electronApp) {
-      try {
-        unregisterElectronShortcuts(config.electronApp);
-        results.electronShortcuts = true;
-        console.log('Windows Key Blocker: Electron shortcuts unregistered');
-      } catch (err) {
-        console.error('Windows Key Blocker: Failed to unregister Electron shortcuts', err);
-      }
-    }
-    
-    // Second attempt: Enhanced restoration for all functionality
-    try {
-      // Kill all blocker processes
-      exec('taskkill /f /im powershell.exe /fi "WINDOWTITLE eq *BlockAltTab*" 2>nul');
-      exec('taskkill /f /im powershell.exe /fi "WINDOWTITLE eq BlockAltTab" 2>nul');
-      exec('wmic process where "name=\'powershell.exe\' and commandline like \'%BlockAltTab%\'" call terminate 2>nul');
-      exec('wmic process where "name=\'powershell.exe\' and commandline like \'%AltTabBlocker%\'" call terminate 2>nul');
-      exec('wmic process where "name=\'powershell.exe\' and commandline like \'%windows-key-blocker%\'" call terminate 2>nul');
-      
-      // Reset keyboard hooks
-      exec('powershell -Command "$sig = \'[DllImport(\\\"user32.dll\\\")] public static extern bool UnhookWindowsHookEx(IntPtr hHook);\' ; Add-Type -MemberDefinition $sig -Name Keyboard -Namespace Win32 ; try { [Win32.Keyboard]::UnhookWindowsHookEx([IntPtr]::Zero) } catch {}"');
-      
-      // Reset StuckRects3 settings for taskbar
-      exec('powershell -Command "$p=\'HKCU:SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3\'; if (Test-Path $p) { $v=(Get-ItemProperty -Path $p).Settings; $v[8]=2; Set-ItemProperty -Path $p -Name Settings -Value $v; }"');
-      
-      // Reset Windows input settings
-      exec('reg add "HKCU\\Control Panel\\Accessibility\\Keyboard Response" /v "Flags" /t REG_DWORD /d 0 /f');
-      exec('reg add "HKCU\\Control Panel\\Accessibility\\ToggleKeys" /v "Flags" /t REG_DWORD /d 0 /f');
-      exec('reg add "HKCU\\Control Panel\\Accessibility\\StickyKeys" /v "Flags" /t REG_DWORD /d 0 /f');
-      exec('reg add "HKCU\\Control Panel\\Accessibility\\FilterKeys" /v "Flags" /t REG_DWORD /d 0 /f');
-      
-      // Fix keyboard scan codes
-      exec('reg delete "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout" /v "Scancode Map" /f 2>nul');
-      
-      // Remove settings backup
-      exec('reg delete "HKCU\\Software\\KioskAppBackup" /f 2>nul');
-      
-      // Enhanced taskbar restoration
-      try {
-        // 1. Delete existing StuckRects3 settings
-        exec('reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3" /v Settings /f');
-        
-        // 2. Set taskbar settings to default values
-        exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSizeMove /t REG_DWORD /d 1 /f');
-        exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSmallIcons /t REG_DWORD /d 0 /f');
-        exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarGlomLevel /t REG_DWORD /d 0 /f');
-        exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v AutoHideTaskBar /t REG_DWORD /d 0 /f');
-        
-        // 3. Recreate StuckRects3 with proper values using PowerShell
-        exec('powershell -ExecutionPolicy Bypass -Command "& {$bytes = [byte[]](0x30,0x00,0x00,0x00,0xfe,0xff,0xff,0xff,0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x3c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x40,0x06,0x00,0x00,0xaf,0x00,0x00,0x00,0x3c,0x00,0x00,0x00,0x00,0x05,0x00,0x00,0x30,0x00,0x00,0x00); New-ItemProperty -Path \'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3\' -Name \'Settings\' -PropertyType Binary -Value $bytes -Force}"');
-        
-        // 4. Remove any policy settings that might hide the taskbar
-        exec('reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer" /v NoTrayItemsDisplay /f');
-        exec('reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer" /v NoTaskbarItemsDisplay /f');
-        
-        console.log('Windows Key Blocker: Enhanced taskbar settings restored');
-      } catch (error) {
-        console.error('Error restoring taskbar settings:', error);
-      }
-      
-      // Restore touchpad gestures
-      exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v EdgeSwipeEnabled /t REG_DWORD /d 1 /f');
-      exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v ThreeFingerSlideEnabled /t REG_DWORD /d 1 /f');
-      exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v FourFingerSlideEnabled /t REG_DWORD /d 1 /f');
-      
-      console.log('Windows Key Blocker: Enhanced restoration completed');
-    } catch (error) {
-      console.error('Windows Key Blocker: Enhanced restoration encountered errors:', error);
-    }
-
-    // Restart Explorer to apply all changes
-    try {
-      // First ensure all Explorer processes are properly terminated
-      exec('taskkill /f /im explorer.exe');
-      
-      // Wait a moment to ensure all processes are terminated
-      setTimeout(() => {
-        // Start Explorer again
-        exec('start explorer.exe');
-        console.log('Windows Key Blocker: Explorer restarted successfully');
-      }, 3000);
-    } catch (error) {
-      console.error('Failed to restart explorer:', error);
-      
-      // Attempt a secondary restart method
-      try {
-        exec('cmd /c "taskkill /f /im explorer.exe && timeout /t 3 && start explorer.exe"');
-      } catch (secondError) {
-        console.error('Failed second explorer restart attempt:', secondError);
-      }
-    }
-
-    blockingActive = false;
-    return results;
-  }
-
-  function enhanceFullKioskMode(enable: boolean): boolean {
-    if (process.platform !== 'win32') return false;
-    
-    if (enable) {
-      enableBlocker();
-      enhanceKioskMode(true);
-      blockingActive = true;
-      return true;
-    } else {
-      disableBlocker();
-      disableKioskMode(false);
-      blockingActive = false;
-      return true;
-    }
-  }
-
-  function isActive(): boolean {
-    return blockingActive;
-  }
-
-  return {
-    enable: enableBlocker,
-    disable: disableBlocker,
-    enhanceKioskMode: enhanceFullKioskMode,
-    isActive,
-    createEmergencyRestoreScript,
-    forceSystemRestore
-  };
 }
 
 // Export direct APIs for advanced usage
 export const native = {
-  startBlockingWindowsKey,
-  stopBlockingWindowsKey
+    startBlockingWindowsKey,
+    stopBlockingWindowsKey
 };
 
 export const altTab = {
-  blockAltTabSwitching,
-  restoreAltTabSwitching
+    blockAltTabSwitching,
+    restoreAltTabSwitching
 };
 
 export const registry = {
-  blockWindowsKeyRegistry,
-  restoreWindowsKeyRegistry,
-  enhanceKioskMode,
-  disableKioskMode
+    blockWindowsKeyRegistry,
+    restoreWindowsKeyRegistry,
+    enhanceKioskMode,
+    disableKioskMode
 };
 
 export const electron = {
-  registerElectronShortcuts,
-  unregisterElectronShortcuts,
-  addBrowserWindowKeyHandlers
+    registerElectronShortcuts,
+    unregisterElectronShortcuts,
+    addBrowserWindowKeyHandlers
 };
 
 // Создаем экстренный скрипт восстановления при загрузке модуля 

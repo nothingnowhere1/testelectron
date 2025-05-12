@@ -1,71 +1,48 @@
-/**
- * Alt+Tab Blocker
- * 
- * Implements additional techniques to prevent Alt+Tab switching in Windows
- * using registry modifications, VBS scripts, and PowerShell scripts.
- */
-
-import { exec } from 'child_process';
+import {exec} from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Отслеживание запущенных процессов для корректной очистки
 let powershellProcessId: string | null = null;
 let backupCreated: boolean = false;
 
-/**
- * Uses additional techniques to prevent Alt+Tab switching in Windows
- * @returns True if the operation was successful
- */
 export function blockAltTabSwitching(): boolean {
-  if (process.platform !== 'win32') return false;
-  
-  try {
-    // Создаем резервную копию настроек перед модификацией
-    createRegistryBackup();
-    
-    // Create a VBS script to disable Alt+Tab via registry
-    createVbsScript();
-    
-    // Create a PowerShell script to further block Alt+Tab
-    createPowershellBlocker();
-    
-    return true;
-  } catch (error) {
-    console.error('Error setting up Alt+Tab blocker:', error);
-    return false;
-  }
-}
+    if (process.platform !== 'win32') return false;
 
-/**
- * Создает резервную копию настроек реестра
- */
-function createRegistryBackup(): void {
-  if (backupCreated) return;
-  
-  try {
-    // Создаем директорию для резервных копий
-    const backupDir = path.join(process.env.TEMP || '.', 'WindowsKeyBlockerBackup');
-    if (!fs.existsSync(backupDir)) {
-      fs.mkdirSync(backupDir, { recursive: true });
+    try {
+        createRegistryBackup();
+
+        createVbsScript();
+
+        createPowershellBlocker();
+
+        return true;
+    } catch (error) {
+        console.error('Error setting up Alt+Tab blocker:', error);
+        return false;
     }
-    
-    // Запускаем экспорт реестра для ключевых веток
-    exec('reg export "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" "' + 
-      path.join(backupDir, 'Explorer_Advanced.reg') + '" /y');
-    
-    backupCreated = true;
-    console.log('Registry backup created');
-  } catch (error) {
-    console.error('Failed to create registry backup:', error);
-  }
 }
 
-/**
- * Create a VBS script to disable Alt+Tab via Windows registry
- */
+function createRegistryBackup(): void {
+    if (backupCreated) return;
+
+    try {
+        const backupDir = path.join(process.env.TEMP || '.', 'WindowsKeyBlockerBackup');
+        if (!fs.existsSync(backupDir)) {
+            fs.mkdirSync(backupDir, {recursive: true});
+        }
+
+        exec('reg export "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" "' +
+            path.join(backupDir, 'Explorer_Advanced.reg') + '" /y');
+
+        backupCreated = true;
+        console.log('Registry backup created');
+    } catch (error) {
+        console.error('Failed to create registry backup:', error);
+    }
+}
+
 function createVbsScript(): void {
-  const vbsContent = `
+    const vbsContent = `
 ' DisableAltTab.vbs - Disables Alt+Tab functionality in Windows
 Option Explicit
 
@@ -124,33 +101,27 @@ ts.Close
 
 WScript.Echo "Alt+Tab blocking registry changes applied. Emergency restore script created at: " & restoreFile
   `;
-  
-  const scriptsDir = path.join(__dirname, '..', '..', 'scripts');
-  const vbsPath = path.join(scriptsDir, 'DisableAltTab.vbs');
-  
-  // Ensure scripts directory exists
-  if (!fs.existsSync(scriptsDir)) {
-    fs.mkdirSync(scriptsDir, { recursive: true });
-  }
-  
-  fs.writeFileSync(vbsPath, vbsContent);
-  
-  // Run the VBS script
-  exec(`cscript //nologo "${vbsPath}"`, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`Error executing VBS script: ${error}`);
-      return;
+
+    const scriptsDir = path.join(__dirname, '..', '..', 'scripts');
+    const vbsPath = path.join(scriptsDir, 'DisableAltTab.vbs');
+
+    if (!fs.existsSync(scriptsDir)) {
+        fs.mkdirSync(scriptsDir, {recursive: true});
     }
-    console.log(`VBS output: ${stdout}`);
-  });
+
+    fs.writeFileSync(vbsPath, vbsContent);
+
+    exec(`cscript //nologo "${vbsPath}"`, (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Error executing VBS script: ${error}`);
+            return;
+        }
+        console.log(`VBS output: ${stdout}`);
+    });
 }
 
-/**
- * Create a PowerShell script to intercept Alt+Tab
- */
 function createPowershellBlocker(): void {
-  const psContent = `
-# PowerShell script to block Alt+Tab via keyboard hook
+    const psContent = `
 $scriptTitle = "BlockAltTab"
 $host.UI.RawUI.WindowTitle = $scriptTitle
 
@@ -248,79 +219,64 @@ public class AltTabBlocker {
 # Start the key blocker
 [AltTabBlocker]::Main()
   `;
-  
-  const scriptsDir = path.join(__dirname, '..', '..', 'scripts');
-  const psPath = path.join(scriptsDir, 'BlockAltTab.ps1');
-  
-  // Ensure scripts directory exists
-  if (!fs.existsSync(scriptsDir)) {
-    fs.mkdirSync(scriptsDir, { recursive: true });
-  }
-  
-  fs.writeFileSync(psPath, psContent);
-  
-  // Run the PowerShell script in hidden window
-  exec(`powershell -WindowStyle Hidden -ExecutionPolicy Bypass -File "${psPath}"`, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`Error executing PowerShell script: ${error}`);
-      return;
+
+    const scriptsDir = path.join(__dirname, '..', '..', 'scripts');
+    const psPath = path.join(scriptsDir, 'BlockAltTab.ps1');
+
+    if (!fs.existsSync(scriptsDir)) {
+        fs.mkdirSync(scriptsDir, {recursive: true});
     }
-    
-    // Сохраняем ID процесса для последующего завершения
-    const backupDir = path.join(process.env.TEMP || '.', 'WindowsKeyBlockerBackup');
-    const pidFile = path.join(backupDir, 'AltTabBlockerPID.txt');
-    
-    // Через секунду пытаемся прочитать файл с ID процесса
-    setTimeout(() => {
-      try {
-        if (fs.existsSync(pidFile)) {
-          powershellProcessId = fs.readFileSync(pidFile, 'utf8').trim();
-          console.log(`PowerShell Alt+Tab blocker started with PID: ${powershellProcessId}`);
+
+    fs.writeFileSync(psPath, psContent);
+
+    exec(`powershell -WindowStyle Hidden -ExecutionPolicy Bypass -File "${psPath}"`, (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Error executing PowerShell script: ${error}`);
+            return;
         }
-      } catch (err) {
-        console.error('Error reading PowerShell process ID:', err);
-      }
-    }, 1000);
-  });
+
+        const backupDir = path.join(process.env.TEMP || '.', 'WindowsKeyBlockerBackup');
+        const pidFile = path.join(backupDir, 'AltTabBlockerPID.txt');
+
+        setTimeout(() => {
+            try {
+                if (fs.existsSync(pidFile)) {
+                    powershellProcessId = fs.readFileSync(pidFile, 'utf8').trim();
+                    console.log(`PowerShell Alt+Tab blocker started with PID: ${powershellProcessId}`);
+                }
+            } catch (err) {
+                console.error('Error reading PowerShell process ID:', err);
+            }
+        }, 1000);
+    });
 }
 
-/**
- * Restore Alt+Tab functionality and fix taskbar appearance
- * @returns True if the operation was successful
- */
 export function restoreAltTabSwitching(): boolean {
-  if (process.platform !== 'win32') return false;
-  
-  console.log('Executing enhanced Alt+Tab functionality restoration');
-  
-  try {
-    // Use additional methods for more thorough restoration
-    // Terminate all PowerShell blockers first
+    if (process.platform !== 'win32') return false;
+
+    console.log('Executing enhanced Alt+Tab functionality restoration');
+
     try {
-      // Terminate by PID if known
-      if (powershellProcessId) {
-        exec(`taskkill /F /PID ${powershellProcessId}`);
-        console.log(`PowerShell process ${powershellProcessId} terminated`);
-        powershellProcessId = null;
-      }
-      
-      // Terminate by window title (multiple patterns)
-      exec('taskkill /f /im powershell.exe /fi "WINDOWTITLE eq BlockAltTab" 2>nul');
-      exec('taskkill /f /im powershell.exe /fi "WINDOWTITLE eq *BlockAltTab*" 2>nul');
-      
-      // Terminate by command line content
-      exec('wmic process where "name=\'powershell.exe\' and commandline like \'%BlockAltTab%\'" call terminate 2>nul');
-      exec('wmic process where "name=\'powershell.exe\' and commandline like \'%AltTabBlocker%\'" call terminate 2>nul');
-      exec('wmic process where "name=\'powershell.exe\' and commandline like \'%windows-key-blocker%\'" call terminate 2>nul');
-      
-      // Force unhook keyboard hooks using PowerShell
-      exec('powershell -Command "$sig = \'[DllImport(\\\"user32.dll\\\")] public static extern bool UnhookWindowsHookEx(IntPtr hHook);\' ; Add-Type -MemberDefinition $sig -Name Keyboard -Namespace Win32 ; try { [Win32.Keyboard]::UnhookWindowsHookEx([IntPtr]::Zero) } catch {}"');
-    } catch (error) {
-      console.error('Error during PowerShell process termination:', error);
-    }
-    
-    // Create and run VBS script to restore original settings
-    const restoreVbsContent = `
+        try {
+            if (powershellProcessId) {
+                exec(`taskkill /F /PID ${powershellProcessId}`);
+                console.log(`PowerShell process ${powershellProcessId} terminated`);
+                powershellProcessId = null;
+            }
+
+            exec('taskkill /f /im powershell.exe /fi "WINDOWTITLE eq BlockAltTab" 2>nul');
+            exec('taskkill /f /im powershell.exe /fi "WINDOWTITLE eq *BlockAltTab*" 2>nul');
+
+            exec('wmic process where "name=\'powershell.exe\' and commandline like \'%BlockAltTab%\'" call terminate 2>nul');
+            exec('wmic process where "name=\'powershell.exe\' and commandline like \'%AltTabBlocker%\'" call terminate 2>nul');
+            exec('wmic process where "name=\'powershell.exe\' and commandline like \'%windows-key-blocker%\'" call terminate 2>nul');
+
+            exec('powershell -Command "$sig = \'[DllImport(\\\"user32.dll\\\")] public static extern bool UnhookWindowsHookEx(IntPtr hHook);\' ; Add-Type -MemberDefinition $sig -Name Keyboard -Namespace Win32 ; try { [Win32.Keyboard]::UnhookWindowsHookEx([IntPtr]::Zero) } catch {}"');
+        } catch (error) {
+            console.error('Error during PowerShell process termination:', error);
+        }
+
+        const restoreVbsContent = `
     ' RestoreSettings.vbs - Restores original Windows settings
     Option Explicit
     
@@ -376,108 +332,108 @@ export function restoreAltTabSwitching(): boolean {
     
     WScript.Echo "Original settings restored"
     `;
-    
-    const scriptsDir = path.join(__dirname, '..', '..', 'scripts');
-    const restoreVbsPath = path.join(scriptsDir, 'RestoreSettings.vbs');
-    
-    // Ensure scripts directory exists
-    if (!fs.existsSync(scriptsDir)) {
-      fs.mkdirSync(scriptsDir, { recursive: true });
-    }
-    
-    fs.writeFileSync(restoreVbsPath, restoreVbsContent);
-    
-    // Run the VBS script
-    exec(`cscript //nologo "${restoreVbsPath}"`, (error, stdout, stderr) => {
-      if (error) {
-        console.error(`Error executing restore script: ${error}`);
-      } else {
-        console.log(`Restore output: ${stdout}`);
-      }
-    });
-    
-    // Если у нас есть ID процесса PowerShell, завершаем его
-    if (powershellProcessId) {
-      try {
-        exec(`taskkill /F /PID ${powershellProcessId}`);
-        console.log(`PowerShell process ${powershellProcessId} terminated`);
-      } catch (error) {
-        console.error(`Failed to terminate PowerShell process: ${error}`);
-      }
-      powershellProcessId = null;
-    } else {
-      // Если ID не сохранён, завершаем по оконному заголовку
-      exec('taskkill /f /im powershell.exe /fi "WINDOWTITLE eq BlockAltTab"');
-    }
-    
-    // Завершаем все процессы PowerShell, которые могут содержать BlockAltTab в командной строке
-    exec('wmic process where "name=\'powershell.exe\' and commandline like \'%BlockAltTab%\'" call terminate');
-    
-    // Apply additional fixes for taskbar size
-    exec(`
+
+        const scriptsDir = path.join(__dirname, '..', '..', 'scripts');
+        const restoreVbsPath = path.join(scriptsDir, 'RestoreSettings.vbs');
+
+        // Ensure scripts directory exists
+        if (!fs.existsSync(scriptsDir)) {
+            fs.mkdirSync(scriptsDir, {recursive: true});
+        }
+
+        fs.writeFileSync(restoreVbsPath, restoreVbsContent);
+
+        // Run the VBS script
+        exec(`cscript //nologo "${restoreVbsPath}"`, (error, stdout, stderr) => {
+            if (error) {
+                console.error(`Error executing restore script: ${error}`);
+            } else {
+                console.log(`Restore output: ${stdout}`);
+            }
+        });
+
+        // Если у нас есть ID процесса PowerShell, завершаем его
+        if (powershellProcessId) {
+            try {
+                exec(`taskkill /F /PID ${powershellProcessId}`);
+                console.log(`PowerShell process ${powershellProcessId} terminated`);
+            } catch (error) {
+                console.error(`Failed to terminate PowerShell process: ${error}`);
+            }
+            powershellProcessId = null;
+        } else {
+            // Если ID не сохранён, завершаем по оконному заголовку
+            exec('taskkill /f /im powershell.exe /fi "WINDOWTITLE eq BlockAltTab"');
+        }
+
+        // Завершаем все процессы PowerShell, которые могут содержать BlockAltTab в командной строке
+        exec('wmic process where "name=\'powershell.exe\' and commandline like \'%BlockAltTab%\'" call terminate');
+
+        // Apply additional fixes for taskbar size
+        exec(`
       reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSizeMove /t REG_DWORD /d 1 /f
       reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSmallIcons /t REG_DWORD /d 0 /f
       reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarGlomLevel /t REG_DWORD /d 0 /f
     `);
-    
-    // Восстанавливаем StuckRects3 для отображения панели задач
-    try {
-      // More comprehensive approach to restore taskbar
-      exec("reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3\" /v Settings /f");
-      exec("powershell -ExecutionPolicy Bypass -Command \"& {$bytes = [byte[]](0x30,0x00,0x00,0x00,0xfe,0xff,0xff,0xff,0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x3c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x40,0x06,0x00,0x00,0xaf,0x00,0x00,0x00,0x3c,0x00,0x00,0x00,0x00,0x05,0x00,0x00,0x30,0x00,0x00,0x00); New-ItemProperty -Path 'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3' -Name 'Settings' -PropertyType Binary -Value $bytes -Force}\"");
-      
-      // Remove any auto-hide settings
-      exec("reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\" /v AutoHideTaskBar /f");
-      
-      // Remove policy settings that might hide taskbar
-      exec("reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\" /v NoTrayItemsDisplay /f");
-      exec("reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\" /v NoAutoTrayNotify /f");
-      exec("reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\" /v NoTaskbarItemsDisplay /f");
-    } catch (err) {
-      console.error('Error restoring taskbar settings:', err);
-    }
-    
-    // Восстанавливаем StuckRects3 для отображения панели задач и запускаем эксплорер непосредственно
-    try {
-      // Reset StuckRects3 settings
-      exec('powershell -ExecutionPolicy Bypass -Command "$p=\'HKCU:SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3\'; if (Test-Path $p) { $v=(Get-ItemProperty -Path $p).Settings; $v[8]=2; Set-ItemProperty -Path $p -Name Settings -Value $v; }"');
-      
-      // Kill explorer first
-      exec('taskkill /f /im explorer.exe');
-      
-      // Set additional taskbar settings
-      exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSizeMove /t REG_DWORD /d 1 /f');
-      exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSmallIcons /t REG_DWORD /d 0 /f');
-      exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarGlomLevel /t REG_DWORD /d 0 /f');
-      
-      // Create and delete StuckRects3 to reset it
-      exec('reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3" /v Settings /f');
-      exec('powershell -ExecutionPolicy Bypass -Command "& {$bytes = [byte[]](0x30,0x00,0x00,0x00,0xfe,0xff,0xff,0xff,0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x3c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x40,0x06,0x00,0x00,0xaf,0x00,0x00,0x00,0x3c,0x00,0x00,0x00,0x00,0x05,0x00,0x00,0x30,0x00,0x00,0x00); New-ItemProperty -Path \'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3\' -Name \'Settings\' -PropertyType Binary -Value $bytes -Force}"');
-      
-      // Wait a moment before restarting explorer
-      setTimeout(() => {
+
+        // Восстанавливаем StuckRects3 для отображения панели задач
         try {
-          exec('start explorer.exe');
-          console.log('Explorer restarted successfully after taskbar settings reset');
+            // More comprehensive approach to restore taskbar
+            exec("reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3\" /v Settings /f");
+            exec("powershell -ExecutionPolicy Bypass -Command \"& {$bytes = [byte[]](0x30,0x00,0x00,0x00,0xfe,0xff,0xff,0xff,0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x3c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x40,0x06,0x00,0x00,0xaf,0x00,0x00,0x00,0x3c,0x00,0x00,0x00,0x00,0x05,0x00,0x00,0x30,0x00,0x00,0x00); New-ItemProperty -Path 'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3' -Name 'Settings' -PropertyType Binary -Value $bytes -Force}\"");
+
+            // Remove any auto-hide settings
+            exec("reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\" /v AutoHideTaskBar /f");
+
+            // Remove policy settings that might hide taskbar
+            exec("reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\" /v NoTrayItemsDisplay /f");
+            exec("reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\" /v NoAutoTrayNotify /f");
+            exec("reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\" /v NoTaskbarItemsDisplay /f");
         } catch (err) {
-          console.error('Error restarting explorer after taskbar reset:', err);
+            console.error('Error restoring taskbar settings:', err);
         }
-      }, 2000);
+
+        // Восстанавливаем StuckRects3 для отображения панели задач и запускаем эксплорер непосредственно
+        try {
+            // Reset StuckRects3 settings
+            exec('powershell -ExecutionPolicy Bypass -Command "$p=\'HKCU:SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3\'; if (Test-Path $p) { $v=(Get-ItemProperty -Path $p).Settings; $v[8]=2; Set-ItemProperty -Path $p -Name Settings -Value $v; }"');
+
+            // Kill explorer first
+            exec('taskkill /f /im explorer.exe');
+
+            // Set additional taskbar settings
+            exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSizeMove /t REG_DWORD /d 1 /f');
+            exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSmallIcons /t REG_DWORD /d 0 /f');
+            exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarGlomLevel /t REG_DWORD /d 0 /f');
+
+            // Create and delete StuckRects3 to reset it
+            exec('reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3" /v Settings /f');
+            exec('powershell -ExecutionPolicy Bypass -Command "& {$bytes = [byte[]](0x30,0x00,0x00,0x00,0xfe,0xff,0xff,0xff,0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x3c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x40,0x06,0x00,0x00,0xaf,0x00,0x00,0x00,0x3c,0x00,0x00,0x00,0x00,0x05,0x00,0x00,0x30,0x00,0x00,0x00); New-ItemProperty -Path \'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3\' -Name \'Settings\' -PropertyType Binary -Value $bytes -Force}"');
+
+            // Wait a moment before restarting explorer
+            setTimeout(() => {
+                try {
+                    exec('start explorer.exe');
+                    console.log('Explorer restarted successfully after taskbar settings reset');
+                } catch (err) {
+                    console.error('Error restarting explorer after taskbar reset:', err);
+                }
+            }, 2000);
+        } catch (error) {
+            console.error('Error restoring taskbar settings:', error);
+
+            // Attempt a secondary method
+            try {
+                exec('cmd /c "taskkill /f /im explorer.exe && timeout /t 2 && start explorer.exe"');
+            } catch (secondError) {
+                console.error('Failed secondary explorer restart attempt:', secondError);
+            }
+        }
+
+        console.log('Alt+Tab functionality and taskbar appearance restored');
+        return true;
     } catch (error) {
-      console.error('Error restoring taskbar settings:', error);
-      
-      // Attempt a secondary method
-      try {
-        exec('cmd /c "taskkill /f /im explorer.exe && timeout /t 2 && start explorer.exe"');
-      } catch (secondError) {
-        console.error('Failed secondary explorer restart attempt:', secondError);
-      }
+        console.error('Error restoring Alt+Tab functionality:', error);
+        return false;
     }
-    
-    console.log('Alt+Tab functionality and taskbar appearance restored');
-    return true;
-  } catch (error) {
-    console.error('Error restoring Alt+Tab functionality:', error);
-    return false;
-  }
 }
