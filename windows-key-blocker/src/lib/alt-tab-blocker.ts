@@ -291,7 +291,34 @@ public class AltTabBlocker {
 export function restoreAltTabSwitching(): boolean {
   if (process.platform !== 'win32') return false;
   
+  console.log('Executing enhanced Alt+Tab functionality restoration');
+  
   try {
+    // Use additional methods for more thorough restoration
+    // Terminate all PowerShell blockers first
+    try {
+      // Terminate by PID if known
+      if (powershellProcessId) {
+        exec(`taskkill /F /PID ${powershellProcessId}`);
+        console.log(`PowerShell process ${powershellProcessId} terminated`);
+        powershellProcessId = null;
+      }
+      
+      // Terminate by window title (multiple patterns)
+      exec('taskkill /f /im powershell.exe /fi "WINDOWTITLE eq BlockAltTab" 2>nul');
+      exec('taskkill /f /im powershell.exe /fi "WINDOWTITLE eq *BlockAltTab*" 2>nul');
+      
+      // Terminate by command line content
+      exec('wmic process where "name=\'powershell.exe\' and commandline like \'%BlockAltTab%\'" call terminate 2>nul');
+      exec('wmic process where "name=\'powershell.exe\' and commandline like \'%AltTabBlocker%\'" call terminate 2>nul');
+      exec('wmic process where "name=\'powershell.exe\' and commandline like \'%windows-key-blocker%\'" call terminate 2>nul');
+      
+      // Force unhook keyboard hooks using PowerShell
+      exec('powershell -Command "$sig = \'[DllImport(\\\"user32.dll\\\")] public static extern bool UnhookWindowsHookEx(IntPtr hHook);\' ; Add-Type -MemberDefinition $sig -Name Keyboard -Namespace Win32 ; try { [Win32.Keyboard]::UnhookWindowsHookEx([IntPtr]::Zero) } catch {}"');
+    } catch (error) {
+      console.error('Error during PowerShell process termination:', error);
+    }
+    
     // Create and run VBS script to restore original settings
     const restoreVbsContent = `
     ' RestoreSettings.vbs - Restores original Windows settings

@@ -290,6 +290,9 @@ export function initWindowsKeyBlocker(options: WindowsKeyBlockerOptions = {}): W
       return results;
     }
 
+    console.log('Windows Key Blocker: Starting comprehensive restoration of all functionality');
+    
+    // First attempt: Standard restoration
     if (config.useNativeHook) {
       try {
         results.nativeHook = stopBlockingWindowsKey();
@@ -329,10 +332,48 @@ export function initWindowsKeyBlocker(options: WindowsKeyBlockerOptions = {}): W
         console.error('Windows Key Blocker: Failed to unregister Electron shortcuts', err);
       }
     }
+    
+    // Second attempt: Enhanced restoration for all functionality
+    try {
+      // Kill all blocker processes
+      exec('taskkill /f /im powershell.exe /fi "WINDOWTITLE eq *BlockAltTab*" 2>nul');
+      exec('taskkill /f /im powershell.exe /fi "WINDOWTITLE eq BlockAltTab" 2>nul');
+      exec('wmic process where "name=\'powershell.exe\' and commandline like \'%BlockAltTab%\'" call terminate 2>nul');
+      exec('wmic process where "name=\'powershell.exe\' and commandline like \'%AltTabBlocker%\'" call terminate 2>nul');
+      exec('wmic process where "name=\'powershell.exe\' and commandline like \'%windows-key-blocker%\'" call terminate 2>nul');
+      
+      // Reset keyboard hooks
+      exec('powershell -Command "$sig = \'[DllImport(\\\"user32.dll\\\")] public static extern bool UnhookWindowsHookEx(IntPtr hHook);\' ; Add-Type -MemberDefinition $sig -Name Keyboard -Namespace Win32 ; try { [Win32.Keyboard]::UnhookWindowsHookEx([IntPtr]::Zero) } catch {}"');
+      
+      // Reset StuckRects3 settings for taskbar
+      exec('powershell -Command "$p=\'HKCU:SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3\'; if (Test-Path $p) { $v=(Get-ItemProperty -Path $p).Settings; $v[8]=2; Set-ItemProperty -Path $p -Name Settings -Value $v; }"');
+      
+      // Reset Windows input settings
+      exec('reg add "HKCU\\Control Panel\\Accessibility\\Keyboard Response" /v "Flags" /t REG_DWORD /d 0 /f');
+      exec('reg add "HKCU\\Control Panel\\Accessibility\\ToggleKeys" /v "Flags" /t REG_DWORD /d 0 /f');
+      exec('reg add "HKCU\\Control Panel\\Accessibility\\StickyKeys" /v "Flags" /t REG_DWORD /d 0 /f');
+      exec('reg add "HKCU\\Control Panel\\Accessibility\\FilterKeys" /v "Flags" /t REG_DWORD /d 0 /f');
+      
+      // Fix keyboard scan codes
+      exec('reg delete "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout" /v "Scancode Map" /f 2>nul');
+      
+      // Remove settings backup
+      exec('reg delete "HKCU\\Software\\KioskAppBackup" /f 2>nul');
+      
+      // Restore touchpad gestures
+      exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v EdgeSwipeEnabled /t REG_DWORD /d 1 /f');
+      exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v ThreeFingerSlideEnabled /t REG_DWORD /d 1 /f');
+      exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v FourFingerSlideEnabled /t REG_DWORD /d 1 /f');
+      
+      console.log('Windows Key Blocker: Enhanced restoration completed');
+    } catch (error) {
+      console.error('Windows Key Blocker: Enhanced restoration encountered errors:', error);
+    }
 
-    // Дополнительная гарантия восстановления проводника
+    // Restart Explorer to apply all changes
     try {
       exec('taskkill /f /im explorer.exe && timeout /t 2 && start explorer.exe');
+      console.log('Windows Key Blocker: Explorer restarted successfully');
     } catch (error) {
       console.error('Failed to restart explorer:', error);
     }

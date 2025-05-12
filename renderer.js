@@ -31,6 +31,9 @@ function updateUI(isKioskMode) {
         document.body.classList.remove("kiosk-mode")
         removeFullscreenOverlay()
         removeEdgeBlockers()
+        
+        // Complete restoration of Windows functionality
+        ipcRenderer.send("complete-restoration")
     }
 }
 
