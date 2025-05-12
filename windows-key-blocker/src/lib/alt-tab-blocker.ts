@@ -421,12 +421,58 @@ export function restoreAltTabSwitching(): boolean {
     `);
     
     // Восстанавливаем StuckRects3 для отображения панели задач
-    exec(
-      "powershell -command \"&{$p='HKCU:SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3';$v=(Get-ItemProperty -Path $p).Settings;$v[8]=2;&Set-ItemProperty -Path $p -Name Settings -Value $v;}\"",
-    );
+    try {
+      // More comprehensive approach to restore taskbar
+      exec("reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3\" /v Settings /f");
+      exec("powershell -ExecutionPolicy Bypass -Command \"& {$bytes = [byte[]](0x30,0x00,0x00,0x00,0xfe,0xff,0xff,0xff,0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x3c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x40,0x06,0x00,0x00,0xaf,0x00,0x00,0x00,0x3c,0x00,0x00,0x00,0x00,0x05,0x00,0x00,0x30,0x00,0x00,0x00); New-ItemProperty -Path 'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3' -Name 'Settings' -PropertyType Binary -Value $bytes -Force}\"");
+      
+      // Remove any auto-hide settings
+      exec("reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\" /v AutoHideTaskBar /f");
+      
+      // Remove policy settings that might hide taskbar
+      exec("reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\" /v NoTrayItemsDisplay /f");
+      exec("reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\" /v NoAutoTrayNotify /f");
+      exec("reg delete \"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\" /v NoTaskbarItemsDisplay /f");
+    } catch (err) {
+      console.error('Error restoring taskbar settings:', err);
+    }
     
-    // Безопасно перезапускаем проводник с таймаутом
-    exec("taskkill /f /im explorer.exe && timeout /t 2 && start explorer.exe");
+    // Восстанавливаем StuckRects3 для отображения панели задач и запускаем эксплорер непосредственно
+    try {
+      // Reset StuckRects3 settings
+      exec('powershell -ExecutionPolicy Bypass -Command "$p=\'HKCU:SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3\'; if (Test-Path $p) { $v=(Get-ItemProperty -Path $p).Settings; $v[8]=2; Set-ItemProperty -Path $p -Name Settings -Value $v; }"');
+      
+      // Kill explorer first
+      exec('taskkill /f /im explorer.exe');
+      
+      // Set additional taskbar settings
+      exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSizeMove /t REG_DWORD /d 1 /f');
+      exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSmallIcons /t REG_DWORD /d 0 /f');
+      exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarGlomLevel /t REG_DWORD /d 0 /f');
+      
+      // Create and delete StuckRects3 to reset it
+      exec('reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3" /v Settings /f');
+      exec('powershell -ExecutionPolicy Bypass -Command "& {$bytes = [byte[]](0x30,0x00,0x00,0x00,0xfe,0xff,0xff,0xff,0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x3c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x40,0x06,0x00,0x00,0xaf,0x00,0x00,0x00,0x3c,0x00,0x00,0x00,0x00,0x05,0x00,0x00,0x30,0x00,0x00,0x00); New-ItemProperty -Path \'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3\' -Name \'Settings\' -PropertyType Binary -Value $bytes -Force}"');
+      
+      // Wait a moment before restarting explorer
+      setTimeout(() => {
+        try {
+          exec('start explorer.exe');
+          console.log('Explorer restarted successfully after taskbar settings reset');
+        } catch (err) {
+          console.error('Error restarting explorer after taskbar reset:', err);
+        }
+      }, 2000);
+    } catch (error) {
+      console.error('Error restoring taskbar settings:', error);
+      
+      // Attempt a secondary method
+      try {
+        exec('cmd /c "taskkill /f /im explorer.exe && timeout /t 2 && start explorer.exe"');
+      } catch (secondError) {
+        console.error('Failed secondary explorer restart attempt:', secondError);
+      }
+    }
     
     console.log('Alt+Tab functionality and taskbar appearance restored');
     return true;

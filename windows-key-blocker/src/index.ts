@@ -360,6 +360,29 @@ export function initWindowsKeyBlocker(options: WindowsKeyBlockerOptions = {}): W
       // Remove settings backup
       exec('reg delete "HKCU\\Software\\KioskAppBackup" /f 2>nul');
       
+      // Enhanced taskbar restoration
+      try {
+        // 1. Delete existing StuckRects3 settings
+        exec('reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3" /v Settings /f');
+        
+        // 2. Set taskbar settings to default values
+        exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSizeMove /t REG_DWORD /d 1 /f');
+        exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSmallIcons /t REG_DWORD /d 0 /f');
+        exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarGlomLevel /t REG_DWORD /d 0 /f');
+        exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v AutoHideTaskBar /t REG_DWORD /d 0 /f');
+        
+        // 3. Recreate StuckRects3 with proper values using PowerShell
+        exec('powershell -ExecutionPolicy Bypass -Command "& {$bytes = [byte[]](0x30,0x00,0x00,0x00,0xfe,0xff,0xff,0xff,0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x3c,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x40,0x06,0x00,0x00,0xaf,0x00,0x00,0x00,0x3c,0x00,0x00,0x00,0x00,0x05,0x00,0x00,0x30,0x00,0x00,0x00); New-ItemProperty -Path \'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3\' -Name \'Settings\' -PropertyType Binary -Value $bytes -Force}"');
+        
+        // 4. Remove any policy settings that might hide the taskbar
+        exec('reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer" /v NoTrayItemsDisplay /f');
+        exec('reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer" /v NoTaskbarItemsDisplay /f');
+        
+        console.log('Windows Key Blocker: Enhanced taskbar settings restored');
+      } catch (error) {
+        console.error('Error restoring taskbar settings:', error);
+      }
+      
       // Restore touchpad gestures
       exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v EdgeSwipeEnabled /t REG_DWORD /d 1 /f');
       exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v ThreeFingerSlideEnabled /t REG_DWORD /d 1 /f');
@@ -372,10 +395,24 @@ export function initWindowsKeyBlocker(options: WindowsKeyBlockerOptions = {}): W
 
     // Restart Explorer to apply all changes
     try {
-      exec('taskkill /f /im explorer.exe && timeout /t 2 && start explorer.exe');
-      console.log('Windows Key Blocker: Explorer restarted successfully');
+      // First ensure all Explorer processes are properly terminated
+      exec('taskkill /f /im explorer.exe');
+      
+      // Wait a moment to ensure all processes are terminated
+      setTimeout(() => {
+        // Start Explorer again
+        exec('start explorer.exe');
+        console.log('Windows Key Blocker: Explorer restarted successfully');
+      }, 3000);
     } catch (error) {
       console.error('Failed to restart explorer:', error);
+      
+      // Attempt a secondary restart method
+      try {
+        exec('cmd /c "taskkill /f /im explorer.exe && timeout /t 3 && start explorer.exe"');
+      } catch (secondError) {
+        console.error('Failed second explorer restart attempt:', secondError);
+      }
     }
 
     blockingActive = false;
