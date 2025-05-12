@@ -16,10 +16,8 @@ import {
 } from './lib/alt-tab-blocker';
 
 import {
-  blockWindowsKeyRegistry,
-  restoreWindowsKeyRegistry,
-  enhanceKioskMode,
-  disableKioskMode
+	disableRegistryBlocker,
+	enableRegistryBlocker
 } from './lib/registry-blocker';
 
 import {
@@ -73,8 +71,6 @@ export interface WindowsKeyBlocker {
   enable: () => BlockerResults;
   /** Disable Windows key blocking */
   disable: () => BlockerResults;
-  /** Enable or disable full kiosk mode with all enhancements */
-  enhanceKioskMode: (enable: boolean) => boolean;
   /** Check if blocking is currently active */
   isActive: () => boolean;
   /** Create a system restore script for emergency use */
@@ -246,7 +242,7 @@ export function initWindowsKeyBlocker(options: WindowsKeyBlockerOptions = {}): W
 
     if (config.useRegistry) {
       try {
-        blockWindowsKeyRegistry();
+        enableRegistryBlocker();
         results.registry = true;
         console.log('Windows Key Blocker: Registry modifications applied');
       } catch (err) {
@@ -304,7 +300,7 @@ export function initWindowsKeyBlocker(options: WindowsKeyBlockerOptions = {}): W
 
     if (config.useRegistry) {
       try {
-        restoreWindowsKeyRegistry();
+        disableRegistryBlocker();
         results.registry = true;
         console.log('Windows Key Blocker: Registry modifications removed');
       } catch (err) {
@@ -396,22 +392,6 @@ export function initWindowsKeyBlocker(options: WindowsKeyBlockerOptions = {}): W
     return results;
   }
 
-  function enhanceFullKioskMode(enable: boolean): boolean {
-    if (process.platform !== 'win32') return false;
-    
-    if (enable) {
-      enableBlocker();
-      enhanceKioskMode(true);
-      blockingActive = true;
-      return true;
-    } else {
-      disableBlocker();
-      disableKioskMode(false);
-      blockingActive = false;
-      return true;
-    }
-  }
-
   function isActive(): boolean {
     return blockingActive;
   }
@@ -419,7 +399,6 @@ export function initWindowsKeyBlocker(options: WindowsKeyBlockerOptions = {}): W
   return {
     enable: enableBlocker,
     disable: disableBlocker,
-    enhanceKioskMode: enhanceFullKioskMode,
     isActive,
     createEmergencyRestoreScript,
     forceSystemRestore
@@ -435,13 +414,6 @@ export const native = {
 export const altTab = {
   blockAltTabSwitching,
   restoreAltTabSwitching
-};
-
-export const registry = {
-  blockWindowsKeyRegistry,
-  restoreWindowsKeyRegistry,
-  enhanceKioskMode,
-  disableKioskMode
 };
 
 export const electron = {

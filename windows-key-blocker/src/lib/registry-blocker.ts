@@ -82,7 +82,7 @@ function backupRegistrySettings(): void {
  * Block Windows key from opening Start menu using registry changes
  * @returns True if successful
  */
-export function blockWindowsKeyRegistry(): boolean {
+function blockWindowsKeyRegistry(): boolean {
     if (process.platform !== 'win32') return false;
 
     try {
@@ -201,11 +201,7 @@ echo Если панель задач все еще не видна, перез�
     }
 }
 
-/**
- * Restore Windows key functionality by removing registry modifications
- * @returns True if successful
- */
-export function restoreWindowsKeyRegistry(): boolean {
+function restoreWindowsKeyRegistry(): boolean {
     if (process.platform !== 'win32') return false;
 
     try {
@@ -318,45 +314,31 @@ function createRestoreVbsScript(): void {
     }
 }
 
-/**
- * Enhance kiosk mode with additional Windows-specific settings
- * @param enable True to enable kiosk mode enhancements, false to disable
- * @returns True if successful
- */
-export function enhanceKioskMode(enable: boolean): boolean {
-    if (process.platform !== 'win32') return false;
+export function enableRegistryBlocker(): boolean {
+	if (process.platform !== 'win32') return false;
+	backupRegistrySettings();
+	blockWindowsKeyRegistry();
+	disableHotCorners();
+	disableActionCenter();
+	disableTouchpadGestures();
+	hideTaskbar();
 
-    if (enable) {
-        backupRegistrySettings();
-        blockWindowsKeyRegistry();
-        disableHotCorners();
-        disableActionCenter();
-        disableTouchpadGestures();
-        hideTaskbar();
-
-        return true;
-    } else {
-        try {
-            createSystemRestoreScript();
-            restoreWindowsKeyRegistry();
-            enableHotCorners();
-            enableActionCenter();
-            enableTouchpadGestures();
-            showTaskbar();
-
-            return true;
-        } catch (error) {
-            console.error("Failed to disable kiosk mode:", error);
-            return false;
-        }
-    }
+	return true;
 }
 
-/**
- * Disable kiosk mode and restore normal Windows functionality
- * @param enable True to enable normal Windows functionality
- * @returns True if successful
- */
-export function disableKioskMode(enable: boolean): boolean {
-    return enhanceKioskMode(!enable);
+export function disableRegistryBlocker(): boolean {
+	if (process.platform !== 'win32') return false;
+	try {
+		createSystemRestoreScript();
+		restoreWindowsKeyRegistry();
+		enableHotCorners();
+		enableActionCenter();
+		enableTouchpadGestures();
+		showTaskbar();
+
+		return true;
+	} catch (error) {
+		console.error("Failed to disable kiosk mode:", error);
+		return false;
+	}
 }
