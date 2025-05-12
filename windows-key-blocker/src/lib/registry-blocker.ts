@@ -2,6 +2,9 @@ import {exec} from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import {hideTaskbar, showTaskbar} from "./taskbar";
+import {disableHotCorners, enableHotCorners} from "./hot-corners";
+import {disableNotificationCenter, enableNotificationCenter} from "./notification";
+import {disableTouchpadGestures, enableTouchpadGestures} from "./touchpad";
 
 function backupRegistrySettings(): void {
     try {
@@ -208,9 +211,6 @@ export function restoreWindowsKeyRegistry(): boolean {
     }
 }
 
-/**
- * Create VBS script to properly restore system settings
- */
 function createRestoreVbsScript(): void {
     try {
         const restoreVbsContent = `
@@ -277,9 +277,7 @@ export function enhanceKioskMode(enable: boolean): boolean {
 
         disableHotCorners();
 
-        disableTaskView();
-
-        disableActionCenter();
+        disableNotificationCenter();
 
         disableTouchpadGestures();
 
@@ -294,9 +292,7 @@ export function enhanceKioskMode(enable: boolean): boolean {
 
             enableHotCorners();
 
-            enableTaskView();
-
-            enableActionCenter();
+            enableNotificationCenter();
 
             enableTouchpadGestures();
 
@@ -317,186 +313,3 @@ export function disableKioskMode(enable: boolean): boolean {
     return enhanceKioskMode(!enable);
 }
 
-/**
- * Disable Windows 10/11 hot corners
- * @returns True if successful
- */
-export function disableHotCorners(): boolean {
-    try {
-        // Disable peek
-        exec(
-            'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v DisablePreviewDesktop /t REG_DWORD /d 1 /f',
-        );
-
-        // Disable task view
-        exec(
-            'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v ShowTaskViewButton /t REG_DWORD /d 0 /f',
-        );
-
-        // Disable Start menu corner
-        exec(
-            'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v Start_ShowClassicMode /t REG_DWORD /d 1 /f',
-        );
-
-        console.log("Windows hot corners disabled");
-        return true;
-    } catch (error) {
-        console.error("Failed to disable hot corners:", error);
-        return false;
-    }
-}
-
-/**
- * Enable Windows 10/11 hot corners
- * @returns True if successful
- */
-export function enableHotCorners(): boolean {
-    try {
-        // Enable peek
-        exec(
-            'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v DisablePreviewDesktop /t REG_DWORD /d 0 /f',
-        );
-
-        // Enable task view
-        exec(
-            'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v ShowTaskViewButton /t REG_DWORD /d 1 /f',
-        );
-
-        // Enable Start menu corner
-        exec(
-            'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v Start_ShowClassicMode /t REG_DWORD /d 0 /f',
-        );
-
-        console.log("Windows hot corners enabled");
-        return true;
-    } catch (error) {
-        console.error("Failed to enable hot corners:", error);
-        return false;
-    }
-}
-
-/**
- * Disable Windows task view
- * @returns True if successful
- */
-export function disableTaskView(): boolean {
-    try {
-        exec(
-            'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarGlomLevel /t REG_DWORD /d 2 /f',
-        );
-        console.log("Task view disabled");
-        return true;
-    } catch (error) {
-        console.error("Failed to disable task view:", error);
-        return false;
-    }
-}
-
-/**
- * Enable Windows task view
- * @returns True if successful
- */
-export function enableTaskView(): boolean {
-    try {
-        exec(
-            'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarGlomLevel /t REG_DWORD /d 0 /f',
-        );
-        console.log("Task view enabled");
-        return true;
-    } catch (error) {
-        console.error("Failed to enable task view:", error);
-        return false;
-    }
-}
-
-/**
- * Disable Windows Action Center
- * @returns True if successful
- */
-export function disableActionCenter(): boolean {
-    try {
-        exec(
-            'reg add "HKCU\\Software\\Policies\\Microsoft\\Windows\\Explorer" /v DisableNotificationCenter /t REG_DWORD /d 1 /f',
-        );
-        console.log("Action Center disabled");
-        return true;
-    } catch (error) {
-        console.error("Failed to disable Action Center:", error);
-        return false;
-    }
-}
-
-/**
- * Enable Windows Action Center
- * @returns True if successful
- */
-export function enableActionCenter(): boolean {
-    try {
-        exec(
-            'reg add "HKCU\\Software\\Policies\\Microsoft\\Windows\\Explorer" /v DisableNotificationCenter /t REG_DWORD /d 0 /f',
-        );
-        console.log("Action Center enabled");
-        return true;
-    } catch (error) {
-        console.error("Failed to enable Action Center:", error);
-        return false;
-    }
-}
-
-/**
- * Disable touchpad edge swipes
- * @returns True if successful
- */
-export function disableTouchpadGestures(): boolean {
-    try {
-        // Disable edge swipes
-        exec(
-            'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v EdgeSwipeEnabled /t REG_DWORD /d 0 /f',
-        );
-
-        // Disable three finger gestures
-        exec(
-            'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v ThreeFingerSlideEnabled /t REG_DWORD /d 0 /f',
-        );
-
-        // Disable four finger gestures
-        exec(
-            'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v FourFingerSlideEnabled /t REG_DWORD /d 0 /f',
-        );
-
-        console.log("Touchpad gestures disabled");
-        return true;
-    } catch (error) {
-        console.error("Failed to disable touchpad gestures:", error);
-        return false;
-    }
-}
-
-/**
- * Enable touchpad edge swipes
- * @returns True if successful
- */
-export function enableTouchpadGestures(): boolean {
-    try {
-        // Enable edge swipes
-        exec(
-            'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v EdgeSwipeEnabled /t REG_DWORD /d 1 /f',
-        );
-
-        // Enable three finger gestures
-        exec(
-            'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v ThreeFingerSlideEnabled /t REG_DWORD /d 1 /f',
-        );
-
-        // Enable four finger gestures
-        exec(
-            'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v FourFingerSlideEnabled /t REG_DWORD /d 1 /f',
-        );
-
-        console.log("Touchpad gestures enabled");
-        return true;
-    } catch (error) {
-        console.error("Failed to enable touchpad gestures:", error);
-        return false;
-    }
-}
