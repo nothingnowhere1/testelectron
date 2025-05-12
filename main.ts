@@ -1,13 +1,10 @@
-// main.js
-const { app, BrowserWindow, ipcMain, globalShortcut, screen, dialog } = require("electron")
-const path = require("path")
+import {app, BrowserWindow, dialog, globalShortcut, ipcMain, screen} from "electron"
+import path from "path"
+import {initWindowsKeyBlocker, WindowsKeyBlocker} from "windows-key-blocker"
 
-// Импортируем наш новый модуль для блокировки Windows клавиши
-const { initWindowsKeyBlocker } = require("windows-key-blocker")
-
-let mainWindow
+let mainWindow: BrowserWindow
 let isKioskMode = false
-let winKeyBlocker = null
+let winKeyBlocker: WindowsKeyBlocker = null
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -29,7 +26,7 @@ function createWindow() {
 
     // Prevent new windows from being created
     mainWindow.webContents.setWindowOpenHandler(() => {
-        return { action: "deny" }
+        return {action: "deny"}
     })
 }
 
@@ -61,8 +58,7 @@ function enableKioskMode() {
 
             // Включаем все блокировки сразу
             winKeyBlocker.enable();
-        }
-        catch (error) {
+        } catch (error) {
             console.error("Failed to enable Windows key blocker:", error)
         }
     } else if (process.platform === "darwin") {
@@ -104,23 +100,7 @@ function disableKioskMode() {
             // Сначала пробуем стандартное отключение
             const result = winKeyBlocker.disable();
         } catch (error) {
-            console.error("Failed to disable kiosk mode:", error);
-            console.log("Attempting emergency system restore...");
-            
-            // При ошибке сразу запускаем экстренное восстановление
-            winKeyBlocker.forceSystemRestore()
-                .then(success => {
-                    console.log("Emergency system restore completed with result:", success);
-                })
-                .catch(error => {
-                    console.error("Error during emergency system restore:", error);
-                    
-                    // Показываем пользователю диалог с инструкциями
-                    dialog.showErrorBox(
-                        "Ошибка восстановления системы", 
-                        "Не удалось полностью восстановить функциональность Windows. Пожалуйста, выполните скрипт восстановления вручную: windows-key-blocker/scripts/EmergencySystemRestore.bat или перезагрузите компьютер."
-                    );
-                });
+            console.log(error)
         }
     }
 
@@ -160,36 +140,13 @@ app.on("window-all-closed", () => {
 // Clean up when app is quitting
 app.on("will-quit", (event) => {
     globalShortcut.unregisterAll()
-    
-    // Также отключаем блокировку Windows клавиши при выходе
-    if (process.platform === "win32" && winKeyBlocker && winKeyBlocker.isActive()) {
-        console.log("Disabling Windows key blocker on app exit");
-        
-        try {
-            // Задерживаем выход на время отключения блокировки
-            event.preventDefault();
-            
-            // Запускаем процесс восстановления
-            winKeyBlocker.forceSystemRestore()
-                .then(() => {
-                    console.log("System restored successfully, quitting app");
-                    app.exit(0);
-                })
-                .catch(error => {
-                    console.error("Failed to restore system on exit:", error);
-                    app.exit(1);
-                });
-        } catch (error) {
-            console.error("Error during system restore on exit:", error);
-        }
-    }
 })
 
 // Prevent the app from exiting when in kiosk mode
 app.on("before-quit", (event) => {
     if (isKioskMode) {
         event.preventDefault()
-        
+
         // Спрашиваем пользователя, хочет ли он выйти
         dialog.showMessageBox(mainWindow, {
             type: 'question',
@@ -202,7 +159,7 @@ app.on("before-quit", (event) => {
             if (result.response === 1) {
                 // Отключаем режим киоска и разрешаем выход
                 disableKioskMode();
-                
+
                 // Даем время на восстановление системы и затем выходим
                 setTimeout(() => {
                     app.exit(0);

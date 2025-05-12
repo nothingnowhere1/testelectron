@@ -2,7 +2,7 @@
   "name": "electron-kiosk-app",
   "version": "1.0.0",
   "description": "Electron application with kiosk mode functionality",
-  "main": "main.js",
+  "main": "main.ts",
   "scripts": {
     "start": "electron .",
     "dev": "cross-env NODE_ENV=development electron .",

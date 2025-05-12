@@ -4,11 +4,12 @@
 
 ## Новая структура проекта
 
-Проект был переработан для использования модульного подхода. Функциональность блокировки клавиши Windows и других системных комбинаций клавиш теперь вынесена в отдельный TypeScript модуль `windows-key-blocker`.
+Проект был переработан для использования модульного подхода. Функциональность блокировки клавиши Windows и других
+системных комбинаций клавиш теперь вынесена в отдельный TypeScript модуль `windows-key-blocker`.
 
 ### Основные компоненты:
 
-- **main.js** - Основной процесс Electron
+- **main.еs** - Основной процесс Electron
 - **windows-key-blocker/** - Модуль для блокировки системных клавиш (TypeScript)
 
 ## Установка и запуск
@@ -23,7 +24,7 @@
    ```bash
    npm install
    ```
-   
+
    Это также автоматически установит и скомпилирует модуль `windows-key-blocker`.
 
 3. Запустите приложение:
@@ -49,15 +50,15 @@
 ### Использование модуля
 
 ```javascript
-const { initWindowsKeyBlocker } = require('windows-key-blocker');
+const {initWindowsKeyBlocker} = require('windows-key-blocker');
 
 // Инициализация блокировщика
 const winKeyBlocker = initWindowsKeyBlocker({
-  useNativeHook: true,
-  useRegistry: true,
-  useAltTabBlocker: true,
-  useElectronShortcuts: true,
-  electronApp: app // Передаем экземпляр app для Electron
+    useNativeHook: true,
+    useRegistry: true,
+    useAltTabBlocker: true,
+    useElectronShortcuts: true,
+    electronApp: app // Передаем экземпляр app для Electron
 });
 
 // Включение блокировки
