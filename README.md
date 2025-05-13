@@ -1,92 +1,84 @@
-# Enhanced Kiosk Mode for Electron Apps
+# Electron Kiosk Application
 
-This solution provides comprehensive system-level blocking of Windows key and Alt+Tab switching in Electron kiosk applications.
+Приложение для режима киоска на основе Electron с расширенной блокировкой системных клавиш Windows.
 
-## Features
+## Новая структура проекта
 
-1. **System-Level Windows Key Blocking**
-   - Uses a native C++ addon with Windows API's low-level keyboard hook
-   - Intercepts and blocks the Windows key before it can open the Start menu
-   - Works at the OS level for maximum effectiveness
+Проект был переработан для использования модульного подхода. Функциональность блокировки клавиши Windows и других системных комбинаций клавиш теперь вынесена в отдельный TypeScript модуль `windows-key-blocker`.
 
-2. **Complete Alt+Tab Blocking**
-   - Prevents users from seeing the Alt+Tab application switcher preview
-   - Uses multiple techniques to block Alt+Tab functionality:
-     - Native C++ hooks to intercept Alt+Tab key combinations
-     - Registry modifications to disable taskbar thumbnails and switching features
-     - PowerShell-based secondary keyboard hook for redundancy
-   
-3. **Multiple Layers of Protection**
-   - System-level hooks via native C++ addon
-   - Registry modifications for system-wide settings
-   - PowerShell and VBScript based blockers
-   - Electron's built-in keyboard shortcut handling
-   - Browser-level event interception
+### Основные компоненты:
 
-## Installation & Building
+- **main.js** - Основной процесс Electron
+- **windows-key-blocker/** - Модуль для блокировки системных клавиш (TypeScript)
 
-The solution requires building a native C++ addon:
+## Установка и запуск
 
-1. Install required dependencies:
+1. Клонируйте репозиторий:
+   ```bash
+   git clone <url-репозитория>
+   cd electron-kiosk-app
+   ```
+
+2. Установите зависимости:
    ```bash
    npm install
    ```
+   
+   Это также автоматически установит и скомпилирует модуль `windows-key-blocker`.
 
-2. Install build tools (if you don't have them already):
-   ```bash
-   npm install -g node-gyp
-   npm install -g windows-build-tools  # On Windows, run as Administrator
-   ```
-
-3. Build the native addon:
-   ```bash
-   # For Electron (recommended)
-   npm run rebuild
-   ```
-
-4. Start the application:
+3. Запустите приложение:
    ```bash
    npm start
    ```
 
-## Requirements
+4. Для разработки:
+   ```bash
+   npm run dev
+   ```
 
-- Windows operating system
-- Visual Studio Build Tools (for C++ compilation)
-- Node.js 14+
-- Administrator privileges for registry modifications
+## Модуль windows-key-blocker
 
-## Technical Details
+Модуль `windows-key-blocker` предоставляет комплексное решение для блокировки системных клавиш в Windows:
 
-### Windows Key Blocking
-The native addon creates a system-level keyboard hook that intercepts Windows key presses (VK_LWIN and VK_RWIN) and prevents them from triggering the Start menu.
+- Блокировка клавиши Windows (левой и правой)
+- Блокировка Alt+Tab и других системных комбинаций
+- Блокировка через реестр Windows
+- Блокировка через глобальные сочетания клавиш Electron
+- Блокировка через нативный C++ аддон
 
-### Alt+Tab Blocking
-Multiple techniques are used to block Alt+Tab functionality:
+### Использование модуля
 
-1. **Native Addon Hook**
-   - Tracks Alt key state and blocks Tab key when Alt is pressed
-   - Intercepts Alt+Tab at the system level
-
-2. **Registry Modifications**
-   - Disables taskbar thumbnails and animations
-   - Modifies window switching behavior
-
-3. **PowerShell Hook**
-   - Secondary keyboard hook using PowerShell and .NET
-   - Provides redundancy if the native hook fails
-
-## Usage in Your Application
-
-Enable kiosk mode with:
 ```javascript
-// In your Electron main process
-const { enableKioskMode } = require('./kiosk-helper');
-enableKioskMode();
+const { initWindowsKeyBlocker } = require('windows-key-blocker');
+
+// Инициализация блокировщика
+const winKeyBlocker = initWindowsKeyBlocker({
+  useNativeHook: true,
+  useRegistry: true,
+  useAltTabBlocker: true,
+  useElectronShortcuts: true,
+  electronApp: app // Передаем экземпляр app для Electron
+});
+
+// Включение блокировки
+winKeyBlocker.enable();
+
+// Улучшенный режим киоска
+winKeyBlocker.enhanceKioskMode(true);
+
+// Отключение блокировки
+winKeyBlocker.disable();
 ```
 
-Disable kiosk mode and restore normal functionality with:
-```javascript
-const { disableKioskMode } = require('./kiosk-helper');
-disableKioskMode();
+## Сборка приложения
+
+Для создания исполняемого файла:
+
+```bash
+npm run build
 ```
+
+## Важные замечания
+
+- Некоторые функции блокировки требуют прав администратора в Windows
+- Комбинацию Ctrl+Alt+Delete невозможно полностью заблокировать из-за ограничений безопасности Windows

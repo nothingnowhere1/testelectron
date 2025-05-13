@@ -7,28 +7,38 @@
     "start": "electron .",
     "dev": "cross-env NODE_ENV=development electron .",
     "build": "electron-builder",
-    "install": "node-gyp rebuild",
-    "rebuild": "electron-rebuild -f -w win_key_blocker"
+    "postinstall": "cd windows-key-blocker && npm install && npm run build"
   },
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@types/node": "^22.15.17",
     "cross-env": "^7.0.3",
     "electron": "^28.1.0",
-    "electron-builder": "^24.9.1",
-    "electron-rebuild": "^3.2.9",
-    "node-gyp": "^9.3.1"
+    "electron-builder": "^24.9.1"
   },
   "dependencies": {
-    "bindings": "^1.5.0",
-    "node-addon-api": "^6.1.0"
+    "windows-key-blocker": "file:./windows-key-blocker"
   },
   "build": {
     "appId": "com.example.electron-kiosk",
     "productName": "Electron Kiosk",
     "win": {
       "target": "nsis"
-    }
-  },
-  "gypfile": true
+    },
+    "extraResources": [
+      {
+        "from": "windows-key-blocker/dist",
+        "to": "windows-key-blocker/dist"
+      },
+      {
+        "from": "windows-key-blocker/addon",
+        "to": "windows-key-blocker/addon"
+      },
+      {
+        "from": "windows-key-blocker/scripts",
+        "to": "windows-key-blocker/scripts"
+      }
+    ]
+  }
 }
