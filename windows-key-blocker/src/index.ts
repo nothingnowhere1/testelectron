@@ -5,21 +5,21 @@
  * in kiosk-mode applications. Includes both high-level and low-level hooks.
  */
 
-import { startBlockingWindowsKey, stopBlockingWindowsKey } from './lib/native-blocker';
+import {startBlockingWindowsKey, stopBlockingWindowsKey} from './lib/native-blocker';
 
-import { blockAltTabSwitching, restoreAltTabSwitching } from './lib/alt-tab-blocker';
+import {blockAltTabSwitching, restoreAltTabSwitching} from './lib/alt-tab-blocker';
 
-import {
-	blockWindowsKeyRegistry, disableKioskMode, enhanceKioskMode, restoreWindowsKeyRegistry
-} from './lib/registry-blocker';
+import {enhanceKioskMode} from './lib/registry-blocker';
 
 import {
-	addBrowserWindowKeyHandlers, registerElectronShortcuts, unregisterElectronShortcuts
+	addBrowserWindowKeyHandlers,
+	registerElectronShortcuts,
+	unregisterElectronShortcuts
 } from './lib/electron-shortcuts';
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { exec } from 'child_process';
+import {exec} from 'child_process';
 
 // Отслеживание текущего состояния блокировки
 let blockingActive = false;
@@ -28,46 +28,46 @@ let blockingActive = false;
  * Configuration options for Windows key blocker
  */
 export interface WindowsKeyBlockerOptions {
-	/** Use native C++ hook (most effective) */
-	useNativeHook?: boolean;
-	/** Use registry modifications */
-	useRegistry?: boolean;
-	/** Block Alt+Tab switching */
-	useAltTabBlocker?: boolean;
-	/** Use Electron global shortcuts */
-	useElectronShortcuts?: boolean;
-	/** Electron app instance for shortcuts */
-	electronApp?: any;
+    /** Use native C++ hook (most effective) */
+    useNativeHook?: boolean;
+    /** Use registry modifications */
+    useRegistry?: boolean;
+    /** Block Alt+Tab switching */
+    useAltTabBlocker?: boolean;
+    /** Use Electron global shortcuts */
+    useElectronShortcuts?: boolean;
+    /** Electron app instance for shortcuts */
+    electronApp?: any;
 }
 
 /**
  * Result object for blocker operations
  */
 export interface BlockerResults {
-	/** Status of native hook operation */
-	nativeHook: boolean;
-	/** Status of registry modification operation */
-	registry: boolean;
-	/** Status of Alt+Tab blocker operation */
-	altTabBlocker: boolean;
-	/** Status of Electron shortcuts operation */
-	electronShortcuts: boolean;
+    /** Status of native hook operation */
+    nativeHook: boolean;
+    /** Status of registry modification operation */
+    registry: boolean;
+    /** Status of Alt+Tab blocker operation */
+    altTabBlocker: boolean;
+    /** Status of Electron shortcuts operation */
+    electronShortcuts: boolean;
 }
 
 /**
  * Windows key blocker control interface
  */
 export interface WindowsKeyBlocker {
-	/** Enable Windows key blocking */
-	enable: () => BlockerResults;
-	/** Disable Windows key blocking */
-	disable: () => BlockerResults;
-	/** Check if blocking is currently active */
-	isActive: () => boolean;
-	/** Create a system restore script for emergency use */
-	createEmergencyRestoreScript: () => string;
-	/** Force a complete system restore even if normal disable failed */
-	forceSystemRestore: () => Promise<boolean>;
+    /** Enable Windows key blocking */
+    enable: () => BlockerResults;
+    /** Disable Windows key blocking */
+    disable: () => BlockerResults;
+    /** Check if blocking is currently active */
+    isActive: () => boolean;
+    /** Create a system restore script for emergency use */
+    createEmergencyRestoreScript: () => string;
+    /** Force a complete system restore even if normal disable failed */
+    forceSystemRestore: () => Promise<boolean>;
 }
 
 /**
@@ -75,7 +75,7 @@ export interface WindowsKeyBlocker {
  * @returns Path to the created script
  */
 function createEmergencyRestoreScript(): string {
-	const restoreScript = `@echo off
+    const restoreScript = `@echo off
 echo Экстренное восстановление функциональности Windows...
 
 REM Завершаем все процессы PowerShell, связанные с блокировкой Alt+Tab
@@ -139,23 +139,23 @@ echo Если панель задач все еще не видна, перез�
 pause
 `;
 
-	try {
-		// Создаем директорию для скриптов
-		const scriptsDir = path.join(__dirname, '..', 'scripts');
-		if (!fs.existsSync(scriptsDir)) {
-			fs.mkdirSync(scriptsDir, {recursive: true});
-		}
+    try {
+        // Создаем директорию для скриптов
+        const scriptsDir = path.join(__dirname, '..', 'scripts');
+        if (!fs.existsSync(scriptsDir)) {
+            fs.mkdirSync(scriptsDir, {recursive: true});
+        }
 
-		// Сохраняем скрипт восстановления
-		const restoreScriptPath = path.join(scriptsDir, 'EmergencySystemRestore.bat');
-		fs.writeFileSync(restoreScriptPath, restoreScript);
+        // Сохраняем скрипт восстановления
+        const restoreScriptPath = path.join(scriptsDir, 'EmergencySystemRestore.bat');
+        fs.writeFileSync(restoreScriptPath, restoreScript);
 
-		console.log(`Emergency restore script created at: ${restoreScriptPath}`);
-		return restoreScriptPath;
-	} catch (error) {
-		console.error('Failed to create emergency restore script:', error);
-		return '';
-	}
+        console.log(`Emergency restore script created at: ${restoreScriptPath}`);
+        return restoreScriptPath;
+    } catch (error) {
+        console.error('Failed to create emergency restore script:', error);
+        return '';
+    }
 }
 
 /**
@@ -163,30 +163,30 @@ pause
  * @returns Promise that resolves to true if successful
  */
 async function forceSystemRestore(): Promise<boolean> {
-	return new Promise((resolve) => {
-		const restoreScriptPath = createEmergencyRestoreScript();
+    return new Promise((resolve) => {
+        const restoreScriptPath = createEmergencyRestoreScript();
 
-		if (!restoreScriptPath) {
-			console.error('Failed to create emergency restore script');
-			resolve(false);
-			return;
-		}
+        if (!restoreScriptPath) {
+            console.error('Failed to create emergency restore script');
+            resolve(false);
+            return;
+        }
 
-		console.log('Executing emergency system restore...');
+        console.log('Executing emergency system restore...');
 
-		// Здесь используем отдельный процесс без ожидания завершения,
-		// чтобы не блокировать основной поток
-		exec(`start cmd /c "${restoreScriptPath}"`, (error) => {
-			if (error) {
-				console.error('Failed to execute emergency restore script:', error);
-				resolve(false);
-			} else {
-				console.log('Emergency restore script executed successfully');
-				blockingActive = false;
-				resolve(true);
-			}
-		});
-	});
+        // Здесь используем отдельный процесс без ожидания завершения,
+        // чтобы не блокировать основной поток
+        exec(`start cmd /c "${restoreScriptPath}"`, (error) => {
+            if (error) {
+                console.error('Failed to execute emergency restore script:', error);
+                resolve(false);
+            } else {
+                console.log('Emergency restore script executed successfully');
+                blockingActive = false;
+                resolve(true);
+            }
+        });
+    });
 }
 
 /**
@@ -195,117 +195,111 @@ async function forceSystemRestore(): Promise<boolean> {
  * @returns Control methods for the blocker
  */
 export function initWindowsKeyBlocker(options: WindowsKeyBlockerOptions = {}): WindowsKeyBlocker {
-	const defaultOptions: WindowsKeyBlockerOptions = {
-		useNativeHook: true, useRegistry: true, useAltTabBlocker: true, useElectronShortcuts: true, electronApp: null
-	};
+    const defaultOptions: WindowsKeyBlockerOptions = {
+        useNativeHook: true, useRegistry: true, useAltTabBlocker: true, useElectronShortcuts: true, electronApp: null
+    };
 
-	const config = {...defaultOptions, ...options};
+    const config = {...defaultOptions, ...options};
 
-	// Создаем скрипт экстренного восстановления при инициализации
-	createEmergencyRestoreScript();
+    // Создаем скрипт экстренного восстановления при инициализации
+    createEmergencyRestoreScript();
 
-	function enableBlocker(): BlockerResults {
-		let results: BlockerResults = {
-			nativeHook: false, registry: false, altTabBlocker: false, electronShortcuts: false
-		};
+    function enableBlocker(): BlockerResults {
+        let results: BlockerResults = {
+            nativeHook: false, registry: false, altTabBlocker: false, electronShortcuts: false
+        };
 
-		if (process.platform !== 'win32') {
-			console.log('Windows Key Blocker: Not running on Windows, some features disabled');
-			return results;
-		}
+        if (process.platform !== 'win32') {
+            console.log('Windows Key Blocker: Not running on Windows, some features disabled');
+            return results;
+        }
 
-		if (config.useNativeHook) {
-			try {
-				results.nativeHook = startBlockingWindowsKey();
-				console.log('Windows Key Blocker: Native hook ' + (
-					results.nativeHook ? 'started' : 'failed'
-				));
-			} catch (err) {
-				console.error('Windows Key Blocker: Failed to start native hook', err);
-			}
-		}
+        if (config.useNativeHook) {
+            try {
+                results.nativeHook = startBlockingWindowsKey();
+                console.log('Windows Key Blocker: Native hook ' + (
+                    results.nativeHook ? 'started' : 'failed'
+                ));
+            } catch (err) {
+                console.error('Windows Key Blocker: Failed to start native hook', err);
+            }
+        }
 
-		if (config.useElectronShortcuts && config.electronApp) {
-			try {
-				registerElectronShortcuts(config.electronApp);
-				results.electronShortcuts = true;
-				console.log('Windows Key Blocker: Electron shortcuts registered');
-			} catch (err) {
-				console.error('Windows Key Blocker: Failed to register Electron shortcuts', err);
-			}
-		}
+        if (config.useElectronShortcuts && config.electronApp) {
+            try {
+                registerElectronShortcuts(config.electronApp);
+                results.electronShortcuts = true;
+                console.log('Windows Key Blocker: Electron shortcuts registered');
+            } catch (err) {
+                console.error('Windows Key Blocker: Failed to register Electron shortcuts', err);
+            }
+        }
 
-		enhanceKioskMode(true);
+        enhanceKioskMode(true);
 
-		blockingActive = true;
-		return results;
-	}
+        blockingActive = true;
+        return results;
+    }
 
-	function disableBlocker(): BlockerResults {
-		let results: BlockerResults = {
-			nativeHook: false, registry: false, altTabBlocker: false, electronShortcuts: false
-		};
+    function disableBlocker(): BlockerResults {
+        let results: BlockerResults = {
+            nativeHook: false, registry: false, altTabBlocker: false, electronShortcuts: false
+        };
 
-		if (process.platform !== 'win32') {
-			return results;
-		}
+        if (process.platform !== 'win32') {
+            return results;
+        }
 
-		console.log('Windows Key Blocker: Starting comprehensive restoration of all functionality');
+        console.log('Windows Key Blocker: Starting comprehensive restoration of all functionality');
 
-		// First attempt: Standard restoration
-		if (config.useNativeHook) {
-			try {
-				results.nativeHook = stopBlockingWindowsKey();
-				console.log('Windows Key Blocker: Native hook ' + (
-					results.nativeHook ? 'stopped' : 'was not running'
-				));
-			} catch (err) {
-				console.error('Windows Key Blocker: Failed to stop native hook', err);
-			}
-		}
+        // First attempt: Standard restoration
+        if (config.useNativeHook) {
+            try {
+                results.nativeHook = stopBlockingWindowsKey();
+                console.log('Windows Key Blocker: Native hook ' + (
+                    results.nativeHook ? 'stopped' : 'was not running'
+                ));
+            } catch (err) {
+                console.error('Windows Key Blocker: Failed to stop native hook', err);
+            }
+        }
 
-		if (config.useElectronShortcuts && config.electronApp) {
-			try {
-				unregisterElectronShortcuts(config.electronApp);
-				results.electronShortcuts = true;
-				console.log('Windows Key Blocker: Electron shortcuts unregistered');
-			} catch (err) {
-				console.error('Windows Key Blocker: Failed to unregister Electron shortcuts', err);
-			}
-		}
+        if (config.useElectronShortcuts && config.electronApp) {
+            try {
+                unregisterElectronShortcuts(config.electronApp);
+                results.electronShortcuts = true;
+                console.log('Windows Key Blocker: Electron shortcuts unregistered');
+            } catch (err) {
+                console.error('Windows Key Blocker: Failed to unregister Electron shortcuts', err);
+            }
+        }
 
-		enhanceKioskMode(false);
+        enhanceKioskMode(false);
 
-		blockingActive = false;
-		return results;
-	}
+        blockingActive = false;
+        return results;
+    }
 
-	function isActive(): boolean {
-		return blockingActive;
-	}
+    function isActive(): boolean {
+        return blockingActive;
+    }
 
-	return {
-		enable: enableBlocker, disable: disableBlocker, isActive, createEmergencyRestoreScript, forceSystemRestore
-	};
+    return {
+        enable: enableBlocker, disable: disableBlocker, isActive, createEmergencyRestoreScript, forceSystemRestore
+    };
 }
 
 // Export direct APIs for advanced usage
 export const native = {
-	startBlockingWindowsKey, stopBlockingWindowsKey
+    startBlockingWindowsKey, stopBlockingWindowsKey
 };
 
 export const altTab = {
-	blockAltTabSwitching, restoreAltTabSwitching
-};
-
-export const registry = {
-	blockWindowsKeyRegistry, restoreWindowsKeyRegistry, enhanceKioskMode, disableKioskMode
+    blockAltTabSwitching, restoreAltTabSwitching
 };
 
 export const electron = {
-	registerElectronShortcuts, unregisterElectronShortcuts, addBrowserWindowKeyHandlers
+    registerElectronShortcuts, unregisterElectronShortcuts, addBrowserWindowKeyHandlers
 };
 
-// Создаем экстренный скрипт восстановления при загрузке модуля 
-// для обеспечения возможности восстановления даже при ошибках
 createEmergencyRestoreScript();
