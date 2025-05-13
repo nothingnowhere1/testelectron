@@ -2,8 +2,7 @@ import {exec} from 'child_process';
 
 export function hideTaskbar(): boolean {
     try {
-        exec('powershell -command "&{Stop-Process -f -ProcessName dwm;}"');
-        console.log('Taskbar hidden');
+        exec('powershell -command "&{(New-Object -ComObject Shell.Application).RestartWindows();}"');
         return true;
     } catch (error) {
         console.error('Failed to hide taskbar:', error);
@@ -13,9 +12,7 @@ export function hideTaskbar(): boolean {
 
 export function showTaskbar(): boolean {
     try {
-        exec('powershell -command "&{Stop-Process -f -ProcessName dwm;}"');
-
-        console.log('Taskbar shown');
+        exec('powershell -command "&{(New-Object -ComObject Shell.Application).RestartWindows();}"');
         return true;
     } catch (error) {
         console.error('Failed to show taskbar:', error);
