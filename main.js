@@ -1,13 +1,14 @@
 // main.js
-const { app, BrowserWindow, ipcMain, globalShortcut, screen, dialog } = require('electron');
+
+const {app, BrowserWindow, ipcMain, globalShortcut, screen, dialog} = require('electron');
 const path = require('path');
 
 // Импортируем наш новый модуль для блокировки Windows клавиши
-const { initWindowsKeyBlocker } = require('windows-key-blocker');
+const {initWindowsKeyBlocker} = require('windows-key-blocker');
 
 let mainWindow;
 let isKioskMode = false;
-let winKeyBlocker = null;
+let winKeyBlocker;
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -29,7 +30,7 @@ function createWindow() {
 
     // Prevent new windows from being created
     mainWindow.webContents.setWindowOpenHandler(() => {
-        return { action: 'deny' };
+        return {action: 'deny'};
     });
 }
 

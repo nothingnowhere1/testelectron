@@ -7,15 +7,9 @@
 
 import {startBlockingWindowsKey, stopBlockingWindowsKey} from './lib/native-blocker';
 
-import {blockAltTabSwitching, restoreAltTabSwitching} from './lib/alt-tab-blocker';
-
 import {enhanceKioskMode} from './lib/registry-blocker';
 
-import {
-	addBrowserWindowKeyHandlers,
-	registerElectronShortcuts,
-	unregisterElectronShortcuts
-} from './lib/electron-shortcuts';
+import {registerElectronShortcuts, unregisterElectronShortcuts} from './lib/electron-shortcuts';
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -294,12 +288,8 @@ export const native = {
     startBlockingWindowsKey, stopBlockingWindowsKey
 };
 
-export const altTab = {
-    blockAltTabSwitching, restoreAltTabSwitching
-};
-
 export const electron = {
-    registerElectronShortcuts, unregisterElectronShortcuts, addBrowserWindowKeyHandlers
+    registerElectronShortcuts, unregisterElectronShortcuts
 };
 
 createEmergencyRestoreScript();
