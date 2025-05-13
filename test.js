@@ -1,23 +1,45 @@
 import {exec} from "child_process";
 
-function disableTouchpadGestures() {
-    // Используем PowerShell для изменения реестра
+// touchpadControl.js - Более эффективный скрипт для управления тачпадом
+const {exec} = require('child_process');
+
+// Функция для отключения тачпада
+function disableTouchpad() {
     const command = `
     powershell.exe -Command "
-      # Отключаем жесты тачпада через реестр
-      $path = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad'
+      # Находим все устройства тачпада
+      $touchpads = Get-PnpDevice | Where-Object {$_.Class -eq 'HIDClass' -and $_.FriendlyName -match '(touchpad|точечная панель|тачпад)'}
       
-      # Проверяем существование пути
-      if (!(Test-Path $path)) {
-        New-Item -Path $path -Force | Out-Null
+      if ($touchpads) {
+        # Отключаем каждый найденный тачпад
+        foreach ($device in $touchpads) {
+          Disable-PnpDevice -InstanceId $device.InstanceId -Confirm:$false
+          Write-Host \"Тачпад '$($device.FriendlyName)' отключен.\"
+        }
+      } else {
+        # Пробуем альтернативный метод поиска
+        $touchpads = Get-PnpDevice | Where-Object {$_.Class -eq 'Mouse' -and $_.FriendlyName -match '(touchpad|точечная панель|тачпад)'}
+        
+        if ($touchpads) {
+          foreach ($device in $touchpads) {
+            Disable-PnpDevice -InstanceId $device.InstanceId -Confirm:$false
+            Write-Host \"Тачпад '$($device.FriendlyName)' отключен.\"
+          }
+        } else {
+          Write-Host \"Не удалось найти устройство тачпада.\"
+        }
       }
       
-      # Отключаем жесты
-      Set-ItemProperty -Path $path -Name 'MultiFingerGestures' -Value 0
-      Set-ItemProperty -Path $path -Name 'ThreeFingerGestures' -Value 0
-      Set-ItemProperty -Path $path -Name 'FourFingerGestures' -Value 0
-      
-      Write-Host 'Жесты тачпада отключены.'
+      # Дополнительно - попытка отключить через службу Synaptics если она существует
+      try {
+        $service = Get-Service -Name '*Synaptics*' -ErrorAction SilentlyContinue
+        if ($service) {
+          Stop-Service -Name $service.Name -Force
+          Write-Host \"Служба Synaptics остановлена.\"
+        }
+      } catch {
+        Write-Host \"Служба Synaptics не найдена или не может быть остановлена.\"
+      }
     "
   `;
 
@@ -26,32 +48,47 @@ function disableTouchpadGestures() {
             console.error(`Ошибка: ${error.message}`);
             return;
         }
-        if (stderr) {
-            console.error(`stderr: ${stderr}`);
-            return;
-        }
         console.log(stdout);
     });
 }
 
-// Функция для включения жестов тачпада
-function enableTouchpadGestures() {
+// Функция для включения тачпада
+function enableTouchpad() {
     const command = `
     powershell.exe -Command "
-      # Включаем жесты тачпада через реестр
-      $path = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad'
+      # Находим все устройства тачпада (даже отключенные)
+      $touchpads = Get-PnpDevice | Where-Object {$_.Class -eq 'HIDClass' -and $_.FriendlyName -match '(touchpad|точечная панель|тачпад)'}
       
-      # Проверяем существование пути
-      if (!(Test-Path $path)) {
-        New-Item -Path $path -Force | Out-Null
+      if ($touchpads) {
+        # Включаем каждый найденный тачпад
+        foreach ($device in $touchpads) {
+          Enable-PnpDevice -InstanceId $device.InstanceId -Confirm:$false
+          Write-Host \"Тачпад '$($device.FriendlyName)' включен.\"
+        }
+      } else {
+        # Пробуем альтернативный метод поиска
+        $touchpads = Get-PnpDevice | Where-Object {$_.Class -eq 'Mouse' -and $_.FriendlyName -match '(touchpad|точечная панель|тачпад)'}
+        
+        if ($touchpads) {
+          foreach ($device in $touchpads) {
+            Enable-PnpDevice -InstanceId $device.InstanceId -Confirm:$false
+            Write-Host \"Тачпад '$($device.FriendlyName)' включен.\"
+          }
+        } else {
+          Write-Host \"Не удалось найти устройство тачпада.\"
+        }
       }
       
-      # Включаем жесты
-      Set-ItemProperty -Path $path -Name 'MultiFingerGestures' -Value 1
-      Set-ItemProperty -Path $path -Name 'ThreeFingerGestures' -Value 1
-      Set-ItemProperty -Path $path -Name 'FourFingerGestures' -Value 1
-      
-      Write-Host 'Жесты тачпада включены.'
+      # Дополнительно - попытка запустить службу Synaptics если она существует
+      try {
+        $service = Get-Service -Name '*Synaptics*' -ErrorAction SilentlyContinue
+        if ($service) {
+          Start-Service -Name $service.Name
+          Write-Host \"Служба Synaptics запущена.\"
+        }
+      } catch {
+        Write-Host \"Служба Synaptics не найдена или не может быть запущена.\"
+      }
     "
   `;
 
@@ -60,14 +97,76 @@ function enableTouchpadGestures() {
             console.error(`Ошибка: ${error.message}`);
             return;
         }
-        if (stderr) {
-            console.error(`stderr: ${stderr}`);
+        console.log(stdout);
+    });
+}
+
+// Альтернативный метод через групповую политику (для некоторых версий Windows)
+function disableTouchpadViaPolicy() {
+    const command = `
+    powershell.exe -Command "
+      # Создаем путь для групповой политики если не существует
+      $path = 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\EdgeUI'
+      if (!(Test-Path $path)) {
+        New-Item -Path $path -Force | Out-Null
+      }
+      
+      # Отключаем жесты края экрана
+      Set-ItemProperty -Path $path -Name 'AllowEdgeSwipe' -Value 0
+      Write-Host 'Жесты края экрана отключены через групповую политику.'
+      
+      # Для Synaptics тачпадов также можно попробовать это
+      $path2 = 'HKLM:\\SOFTWARE\\Synaptics\\SynTP\\TouchPadPS2'
+      if (Test-Path $path2) {
+        Set-ItemProperty -Path $path2 -Name 'EdgeMotionOptions' -Value 0
+        Write-Host 'Synaptics TouchPad жесты отключены.'
+      }
+    "
+  `;
+
+    exec(command, (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Ошибка: ${error.message}`);
             return;
         }
         console.log(stdout);
     });
 }
 
-disableTouchpadGestures();
+// Включение через групповую политику
+function enableTouchpadViaPolicy() {
+    const command = `
+    powershell.exe -Command "
+      # Проверяем существование пути для групповой политики
+      $path = 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\EdgeUI'
+      if (Test-Path $path) {
+        # Включаем жесты края экрана
+        Set-ItemProperty -Path $path -Name 'AllowEdgeSwipe' -Value 1
+        Write-Host 'Жесты края экрана включены через групповую политику.'
+      }
+      
+      # Для Synaptics тачпадов также можно попробовать это
+      $path2 = 'HKLM:\\SOFTWARE\\Synaptics\\SynTP\\TouchPadPS2'
+      if (Test-Path $path2) {
+        Set-ItemProperty -Path $path2 -Name 'EdgeMotionOptions' -Value 15
+        Write-Host 'Synaptics TouchPad жесты включены.'
+      }
+    "
+  `;
 
-setTimeout(enableTouchpadGestures, 10000);
+    exec(command, (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Ошибка: ${error.message}`);
+            return;
+        }
+        console.log(stdout);
+    });
+}
+
+disableTouchpad();
+disableTouchpadViaPolicy();
+
+setTimeout(() => {
+    enableTouchpad();
+    enableTouchpadViaPolicy()
+}, 10000);
