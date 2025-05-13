@@ -1,10 +1,3 @@
-/**
- * Windows Key Blocker Module
- *
- * A comprehensive module for blocking Windows key and other system shortcuts
- * in kiosk-mode applications. Includes both high-level and low-level hooks.
- */
-
 import {startBlockingWindowsKey, stopBlockingWindowsKey} from './lib/native-blocker';
 
 import {enhanceKioskMode} from './lib/registry-blocker';
@@ -15,59 +8,26 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {exec} from 'child_process';
 
-// Отслеживание текущего состояния блокировки
 let blockingActive = false;
 
-/**
- * Configuration options for Windows key blocker
- */
 export interface WindowsKeyBlockerOptions {
-    /** Use native C++ hook (most effective) */
     useNativeHook?: boolean;
-    /** Use registry modifications */
-    useRegistry?: boolean;
-    /** Block Alt+Tab switching */
-    useAltTabBlocker?: boolean;
-    /** Use Electron global shortcuts */
     useElectronShortcuts?: boolean;
-    /** Electron app instance for shortcuts */
     electronApp?: any;
 }
 
-/**
- * Result object for blocker operations
- */
 export interface BlockerResults {
-    /** Status of native hook operation */
     nativeHook: boolean;
-    /** Status of registry modification operation */
-    registry: boolean;
-    /** Status of Alt+Tab blocker operation */
-    altTabBlocker: boolean;
-    /** Status of Electron shortcuts operation */
     electronShortcuts: boolean;
 }
 
-/**
- * Windows key blocker control interface
- */
 export interface WindowsKeyBlocker {
-    /** Enable Windows key blocking */
     enable: () => BlockerResults;
-    /** Disable Windows key blocking */
     disable: () => BlockerResults;
-    /** Check if blocking is currently active */
     isActive: () => boolean;
-    /** Create a system restore script for emergency use */
-    createEmergencyRestoreScript: () => string;
-    /** Force a complete system restore even if normal disable failed */
     forceSystemRestore: () => Promise<boolean>;
 }
 
-/**
- * Creates an emergency script to restore system functionality
- * @returns Path to the created script
- */
 function createEmergencyRestoreScript(): string {
     const restoreScript = `@echo off
 echo Экстренное восстановление функциональности Windows...
@@ -134,13 +94,11 @@ pause
 `;
 
     try {
-        // Создаем директорию для скриптов
         const scriptsDir = path.join(__dirname, '..', 'scripts');
         if (!fs.existsSync(scriptsDir)) {
             fs.mkdirSync(scriptsDir, {recursive: true});
         }
 
-        // Сохраняем скрипт восстановления
         const restoreScriptPath = path.join(scriptsDir, 'EmergencySystemRestore.bat');
         fs.writeFileSync(restoreScriptPath, restoreScript);
 
@@ -152,10 +110,6 @@ pause
     }
 }
 
-/**
- * Force a complete system restoration (for emergency use)
- * @returns Promise that resolves to true if successful
- */
 async function forceSystemRestore(): Promise<boolean> {
     return new Promise((resolve) => {
         const restoreScriptPath = createEmergencyRestoreScript();
@@ -168,8 +122,6 @@ async function forceSystemRestore(): Promise<boolean> {
 
         console.log('Executing emergency system restore...');
 
-        // Здесь используем отдельный процесс без ожидания завершения,
-        // чтобы не блокировать основной поток
         exec(`start cmd /c "${restoreScriptPath}"`, (error) => {
             if (error) {
                 console.error('Failed to execute emergency restore script:', error);
@@ -183,24 +135,18 @@ async function forceSystemRestore(): Promise<boolean> {
     });
 }
 
-/**
- * Initialize Windows key blocking with all available methods
- * @param options Configuration options
- * @returns Control methods for the blocker
- */
 export function initWindowsKeyBlocker(options: WindowsKeyBlockerOptions = {}): WindowsKeyBlocker {
     const defaultOptions: WindowsKeyBlockerOptions = {
-        useNativeHook: true, useRegistry: true, useAltTabBlocker: true, useElectronShortcuts: true, electronApp: null
+        useNativeHook: true, useElectronShortcuts: true, electronApp: null
     };
 
     const config = {...defaultOptions, ...options};
 
-    // Создаем скрипт экстренного восстановления при инициализации
     createEmergencyRestoreScript();
 
     function enableBlocker(): BlockerResults {
         let results: BlockerResults = {
-            nativeHook: false, registry: false, altTabBlocker: false, electronShortcuts: false
+            nativeHook: false, electronShortcuts: false
         };
 
         if (process.platform !== 'win32') {
@@ -237,16 +183,13 @@ export function initWindowsKeyBlocker(options: WindowsKeyBlockerOptions = {}): W
 
     function disableBlocker(): BlockerResults {
         let results: BlockerResults = {
-            nativeHook: false, registry: false, altTabBlocker: false, electronShortcuts: false
+            nativeHook: false, electronShortcuts: false
         };
 
         if (process.platform !== 'win32') {
             return results;
         }
-
-        console.log('Windows Key Blocker: Starting comprehensive restoration of all functionality');
-
-        // First attempt: Standard restoration
+        
         if (config.useNativeHook) {
             try {
                 results.nativeHook = stopBlockingWindowsKey();
@@ -279,17 +222,8 @@ export function initWindowsKeyBlocker(options: WindowsKeyBlockerOptions = {}): W
     }
 
     return {
-        enable: enableBlocker, disable: disableBlocker, isActive, createEmergencyRestoreScript, forceSystemRestore
+        enable: enableBlocker, disable: disableBlocker, isActive, forceSystemRestore
     };
 }
-
-// Export direct APIs for advanced usage
-export const native = {
-    startBlockingWindowsKey, stopBlockingWindowsKey
-};
-
-export const electron = {
-    registerElectronShortcuts, unregisterElectronShortcuts
-};
 
 createEmergencyRestoreScript();

@@ -3,12 +3,6 @@ interface ElectronApp {
     whenReady: () => Promise<any>;
 }
 
-interface BrowserWindow {
-    webContents: {
-        on: (eventName: string, listener: (event: any, input: any) => void) => void;
-    };
-}
-
 interface GlobalShortcut {
     register: (accelerator: string, callback: () => boolean) => boolean;
     unregisterAll: () => void;
