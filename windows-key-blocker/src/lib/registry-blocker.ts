@@ -1,6 +1,6 @@
 /**
  * Windows Registry Blocker
- * 
+ *
  * Implements Windows key blocking using registry modifications.
  * These techniques modify system settings to disable various
  * Windows hotkeys and shortcuts.
@@ -17,9 +17,9 @@ let registryModified = false;
  * Создает резервную копию реестра перед модификацией
  */
 function backupRegistrySettings(): void {
-  try {
-    // Создаем VBS скрипт для резервного копирования важных настроек
-    const backupVbsContent = `
+	try {
+		// Создаем VBS скрипт для резервного копирования важных настроек
+		const backupVbsContent = `
     ' BackupSettings.vbs - Creates backup of important Windows settings
     Option Explicit
     
@@ -51,27 +51,27 @@ function backupRegistrySettings(): void {
     
     WScript.Echo "Registry backup created at: " & backupFile
     `;
-    
-    // Директория для скриптов
-    const scriptsDir = path.join(__dirname, '..', '..', 'scripts');
-    if (!fs.existsSync(scriptsDir)) {
-      fs.mkdirSync(scriptsDir, { recursive: true });
-    }
-    
-    const backupVbsPath = path.join(scriptsDir, 'BackupSettings.vbs');
-    fs.writeFileSync(backupVbsPath, backupVbsContent);
-    
-    // Запускаем скрипт для создания резервной копии
-    exec(`cscript //nologo "${backupVbsPath}"`, (error, stdout) => {
-      if (error) {
-        console.error(`Error creating registry backup: ${error}`);
-      } else {
-        console.log(`Registry backup: ${stdout.trim()}`);
-      }
-    });
-  } catch (error) {
-    console.error('Failed to create registry backup:', error);
-  }
+
+		// Директория для скриптов
+		const scriptsDir = path.join(__dirname, '..', '..', 'scripts');
+		if (!fs.existsSync(scriptsDir)) {
+			fs.mkdirSync(scriptsDir, {recursive: true});
+		}
+
+		const backupVbsPath = path.join(scriptsDir, 'BackupSettings.vbs');
+		fs.writeFileSync(backupVbsPath, backupVbsContent);
+
+		// Запускаем скрипт для создания резервной копии
+		exec(`cscript //nologo "${backupVbsPath}"`, (error, stdout) => {
+			if (error) {
+				console.error(`Error creating registry backup: ${error}`);
+			} else {
+				console.log(`Registry backup: ${stdout.trim()}`);
+			}
+		});
+	} catch (error) {
+		console.error('Failed to create registry backup:', error);
+	}
 }
 
 /**
@@ -79,51 +79,42 @@ function backupRegistrySettings(): void {
  * @returns True if successful
  */
 export function blockWindowsKeyRegistry(): boolean {
-  if (process.platform !== 'win32') return false;
-  
-  try {
-    // Backup registry settings before modifications
-    backupRegistrySettings();
-    
-    // Disable Windows key through registry
-    // Method 1: Disable Start menu when Windows key is pressed
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v DisabledHotkeys /t REG_SZ /d "LWin;RWin" /f',
-    );
+	if (process.platform !== 'win32') return false;
 
-    // Method 2: Disable Windows key functionality completely
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer" /v NoWinKeys /t REG_DWORD /d 1 /f',
-    );
+	try {
+		// Backup registry settings before modifications
+		backupRegistrySettings();
 
-    // Method 3: Disable Start menu
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer" /v NoStartMenuMorePrograms /t REG_DWORD /d 1 /f',
-    );
+		// Disable Windows key through registry
+		// Method 1: Disable Start menu when Windows key is pressed
+		exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v DisabledHotkeys /t REG_SZ /d "LWin;RWin" /f');
 
-    // Method 4: Remap Windows key scancode (more aggressive) - DISABLED due to potential issues
-    // exec(
-    //   'reg add "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout" /v "Scancode Map" /t REG_BINARY /d 00000000000000000300000000005BE000005CE000000000 /f',
-    // );
+		// Method 2: Disable Windows key functionality completely
+		exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer" /v NoWinKeys /t REG_DWORD /d 1 /f');
 
-    // Restart explorer to apply changes - MODIFIED to be less aggressive
-    exec("taskkill /f /im explorer.exe && start explorer.exe");
+		// Method 3: Disable Start menu
+		exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer" /v NoStartMenuMorePrograms /t REG_DWORD /d 1 /f');
 
-    registryModified = true;
-    console.log("Windows key disabled from opening Start menu");
-    return true;
-  } catch (error) {
-    console.error("Failed to block Windows key through registry:", error);
-    return false;
-  }
+		// Method 4: Remap Windows key scancode (more aggressive) - DISABLED due to potential issues
+		// exec(
+		//   'reg add "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout" /v "Scancode Map" /t REG_BINARY /d 00000000000000000300000000005BE000005CE000000000 /f',
+		// );
+
+		registryModified = true;
+		console.log('Windows key disabled from opening Start menu');
+		return true;
+	} catch (error) {
+		console.error('Failed to block Windows key through registry:', error);
+		return false;
+	}
 }
 
 /**
  * Создание и сохранение скрипта для полного восстановления системы
  */
 function createSystemRestoreScript(): void {
-  try {
-    const restoreScript = `@echo off
+	try {
+		const restoreScript = `@echo off
 echo Восстановление функциональности Windows...
 
 REM Удаление всех модификаций реестра
@@ -163,38 +154,28 @@ reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanc
 reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarNoThumbnail" /f 2>nul
 reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\ListviewAlphaSelect" /f 2>nul
 
-REM Восстановление StuckRects3
-echo Восстановление настроек панели задач (StuckRects3)...
-powershell -command "$p='HKCU:SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3';$v=(Get-ItemProperty -Path $p).Settings;$v[8]=2;Set-ItemProperty -Path $p -Name Settings -Value $v;"
-
 REM Завершение процессов PowerShell, которые могут блокировать Alt+Tab
 echo Завершение блокировщиков Alt+Tab...
 taskkill /f /im powershell.exe /fi "WINDOWTITLE eq *BlockAltTab*" 2>nul
 
-REM Перезапуск проводника
-echo Перезапуск проводника...
-taskkill /f /im explorer.exe
-timeout /t 2
-start explorer.exe
-
 echo Система восстановлена!
 echo Если панель задач все еще не видна, перезагрузите компьютер.
 `;
-    
-    // Директория для скриптов
-    const scriptsDir = path.join(__dirname, '..', '..', 'scripts');
-    if (!fs.existsSync(scriptsDir)) {
-      fs.mkdirSync(scriptsDir, { recursive: true });
-    }
-    
-    // Сохраняем скрипт восстановления
-    const restoreScriptPath = path.join(scriptsDir, 'RestoreWindowsSystem.bat');
-    fs.writeFileSync(restoreScriptPath, restoreScript);
-    
-    console.log(`System restore script created at: ${restoreScriptPath}`);
-  } catch (error) {
-    console.error('Failed to create system restore script:', error);
-  }
+
+		// Директория для скриптов
+		const scriptsDir = path.join(__dirname, '..', '..', 'scripts');
+		if (!fs.existsSync(scriptsDir)) {
+			fs.mkdirSync(scriptsDir, {recursive: true});
+		}
+
+		// Сохраняем скрипт восстановления
+		const restoreScriptPath = path.join(scriptsDir, 'RestoreWindowsSystem.bat');
+		fs.writeFileSync(restoreScriptPath, restoreScript);
+
+		console.log(`System restore script created at: ${restoreScriptPath}`);
+	} catch (error) {
+		console.error('Failed to create system restore script:', error);
+	}
 }
 
 /**
@@ -202,116 +183,24 @@ echo Если панель задач все еще не видна, перез�
  * @returns True if successful
  */
 export function restoreWindowsKeyRegistry(): boolean {
-  if (process.platform !== 'win32') return false;
-  
-  try {
-    // Create system restore script for manual recovery
-    createSystemRestoreScript();
-    
-    // Remove registry modifications
-    exec(
-      'reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v DisabledHotkeys /f',
-    );
-    exec(
-      'reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer" /v NoWinKeys /f',
-    );
-    exec(
-      'reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer" /v NoStartMenuMorePrograms /f',
-    );
-    
-    // Scancode Map - может потребовать перезагрузку, поэтому пытаемся удалить, но не останавливаемся на ошибке
-    exec(
-      'reg delete "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout" /v "Scancode Map" /f',
-    );
+	if (process.platform !== 'win32') return false;
 
-    // Восстановление настроек панели задач
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSizeMove /t REG_DWORD /d 1 /f',
-    );
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSmallIcons /t REG_DWORD /d 0 /f',
-    );
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarGlomLevel /t REG_DWORD /d 0 /f',
-    );
-    
-    // Восстановление StuckRects3 для отображения панели задач
-    exec(
-      "powershell -command \"&{$p='HKCU:SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3';$v=(Get-ItemProperty -Path $p).Settings;$v[8]=2;&Set-ItemProperty -Path $p -Name Settings -Value $v;}\"",
-    );
+	try {
+		// Create system restore script for manual recovery
+		createSystemRestoreScript();
 
-    // Restart explorer to apply changes
-    exec("taskkill /f /im explorer.exe && timeout /t 2 && start explorer.exe");
+		// Remove registry modifications
+		exec('reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v DisabledHotkeys /f');
+		exec('reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer" /v NoWinKeys /f');
+		exec('reg delete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer" /v NoStartMenuMorePrograms /f');
 
-    // Use VBS to apply additional fixes
-    createRestoreVbsScript();
-
-    registryModified = false;
-    console.log("Windows key functionality restored");
-    return true;
-  } catch (error) {
-    console.error("Failed to restore Windows key functionality:", error);
-    return false;
-  }
-}
-
-/**
- * Create VBS script to properly restore system settings
- */
-function createRestoreVbsScript(): void {
-  try {
-    const restoreVbsContent = `
-    ' RestoreSettings.vbs - Restores original Windows settings
-    Option Explicit
-    
-    Dim WshShell
-    Set WshShell = CreateObject("WScript.Shell")
-    
-    ' Delete registry modifications we made
-    On Error Resume Next
-    WshShell.RegDelete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\DisabledHotkeys"
-    WshShell.RegDelete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\NoWinKeys"
-    WshShell.RegDelete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\NoStartMenuMorePrograms"
-    
-    ' Delete all modifications
-    WshShell.RegDelete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\DisallowShaking"
-    WshShell.RegDelete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\ExtendedUIHoverTime"
-    WshShell.RegDelete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarNoThumbnail"
-    WshShell.RegDelete "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\ListviewAlphaSelect"
-    
-    ' Restore Windows 10/11 default values
-    WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarSizeMove", 1, "REG_DWORD"
-    WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarSmallIcons", 0, "REG_DWORD"
-    WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\IconsOnly", 0, "REG_DWORD"
-    WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarAnimations", 1, "REG_DWORD"
-    
-    ' Fix specific taskbar size issue
-    WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarSizeMove", 1, "REG_DWORD"
-    WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarSmallIcons", 0, "REG_DWORD"
-    WshShell.RegWrite "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced\\TaskbarGlomLevel", 0, "REG_DWORD"
-    
-    WScript.Echo "Original settings restored"
-    `;
-    
-    const scriptsDir = path.join(__dirname, '..', '..', 'scripts');
-    if (!fs.existsSync(scriptsDir)) {
-      fs.mkdirSync(scriptsDir, { recursive: true });
-    }
-    
-    const restoreVbsPath = path.join(scriptsDir, 'CompleteRestore.vbs');
-    fs.writeFileSync(restoreVbsPath, restoreVbsContent);
-    
-    // Run the VBS script
-    exec(`cscript //nologo "${restoreVbsPath}"`, (error, stdout) => {
-      if (error) {
-        console.error(`Error executing restore script: ${error}`);
-      } else {
-        console.log(`Restore output: ${stdout}`);
-      }
-    });
-  } catch (error) {
-    console.error('Failed to create/execute VBS restore script:', error);
-  }
+		registryModified = false;
+		console.log('Windows key functionality restored');
+		return true;
+	} catch (error) {
+		console.error('Failed to restore Windows key functionality:', error);
+		return false;
+	}
 }
 
 /**
@@ -320,63 +209,50 @@ function createRestoreVbsScript(): void {
  * @returns True if successful
  */
 export function enhanceKioskMode(enable: boolean): boolean {
-  if (process.platform !== 'win32') return false;
+	if (process.platform !== 'win32') return false;
 
-  if (enable) {
-    // Backup registry settings before modifications
-    backupRegistrySettings();
-    
-    // Block Windows key opening Start menu
-    blockWindowsKeyRegistry();
+	console.log('enhanceKioskMode:', enable);
+	if (enable) {
+		console.log('enhanceKioskMode:', enable);
 
-    // Disable Windows hot corners and gestures
-    disableHotCorners();
+		// Backup registry settings before modifications
+		backupRegistrySettings();
 
-    // Disable task view
-    disableTaskView();
+		// // Block Windows key opening Start menu
+		// blockWindowsKeyRegistry();
 
-    // Disable Action Center
-    disableActionCenter();
+		// Disable Windows hot corners and gestures
+		disableHotCorners();
 
-    // Disable touchpad edge swipes
-    disableTouchpadGestures();
+		// Disable Action Center
+		disableActionCenter();
 
-    // Optional: Hide taskbar completely (but now using a safer method)
-    hideTaskbar();
-    
-    return true;
-  } else {
-    try {
-      // First create a complete restore script for emergency use
-      createSystemRestoreScript();
-      
-      // Restore Windows key functionality
-      restoreWindowsKeyRegistry();
+		// Disable touchpad edge swipes
+		disableTouchpadGestures();
 
-      // Restore Windows hot corners and gestures
-      enableHotCorners();
+		return true;
+	} else {
+		try {
+			// First create a complete restore script for emergency use
+			createSystemRestoreScript();
 
-      // Enable task view
-      enableTaskView();
+			// // Restore Windows key functionality
+			// restoreWindowsKeyRegistry();
 
-      // Enable Action Center
-      enableActionCenter();
+			// Restore Windows hot corners and gestures
+			enableHotCorners();
 
-      // Enable touchpad edge swipes
-      enableTouchpadGestures();
+			// Enable Action Center
+			enableActionCenter();
 
-      // Show taskbar if it was hidden
-      showTaskbar();
-      
-      // Перезапуск проводника для применения изменений
-      exec("taskkill /f /im explorer.exe && timeout /t 2 && start explorer.exe");
-      
-      return true;
-    } catch (error) {
-      console.error("Failed to disable kiosk mode:", error);
-      return false;
-    }
-  }
+			// Enable touchpad edge swipes
+			enableTouchpadGestures();
+			return true;
+		} catch (error) {
+			console.error('Failed to disable kiosk mode:', error);
+			return false;
+		}
+	}
 }
 
 /**
@@ -385,7 +261,7 @@ export function enhanceKioskMode(enable: boolean): boolean {
  * @returns True if successful
  */
 export function disableKioskMode(enable: boolean): boolean {
-  return enhanceKioskMode(!enable);
+	return enhanceKioskMode(!enable);
 }
 
 /**
@@ -393,28 +269,22 @@ export function disableKioskMode(enable: boolean): boolean {
  * @returns True if successful
  */
 export function disableHotCorners(): boolean {
-  try {
-    // Disable peek
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v DisablePreviewDesktop /t REG_DWORD /d 1 /f',
-    );
+	try {
+		// Disable peek
+		exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v DisablePreviewDesktop /t REG_DWORD /d 1 /f');
 
-    // Disable task view
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v ShowTaskViewButton /t REG_DWORD /d 0 /f',
-    );
+		// Disable task view
+		exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v ShowTaskViewButton /t REG_DWORD /d 0 /f');
 
-    // Disable Start menu corner
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v Start_ShowClassicMode /t REG_DWORD /d 1 /f',
-    );
+		// Disable Start menu corner
+		exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v Start_ShowClassicMode /t REG_DWORD /d 1 /f');
 
-    console.log("Windows hot corners disabled");
-    return true;
-  } catch (error) {
-    console.error("Failed to disable hot corners:", error);
-    return false;
-  }
+		console.log('Windows hot corners disabled');
+		return true;
+	} catch (error) {
+		console.error('Failed to disable hot corners:', error);
+		return false;
+	}
 }
 
 /**
@@ -422,62 +292,22 @@ export function disableHotCorners(): boolean {
  * @returns True if successful
  */
 export function enableHotCorners(): boolean {
-  try {
-    // Enable peek
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v DisablePreviewDesktop /t REG_DWORD /d 0 /f',
-    );
+	try {
+		// Enable peek
+		exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v DisablePreviewDesktop /t REG_DWORD /d 0 /f');
 
-    // Enable task view
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v ShowTaskViewButton /t REG_DWORD /d 1 /f',
-    );
+		// Enable task view
+		exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v ShowTaskViewButton /t REG_DWORD /d 1 /f');
 
-    // Enable Start menu corner
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v Start_ShowClassicMode /t REG_DWORD /d 0 /f',
-    );
+		// Enable Start menu corner
+		exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v Start_ShowClassicMode /t REG_DWORD /d 0 /f');
 
-    console.log("Windows hot corners enabled");
-    return true;
-  } catch (error) {
-    console.error("Failed to enable hot corners:", error);
-    return false;
-  }
-}
-
-/**
- * Disable Windows task view
- * @returns True if successful
- */
-export function disableTaskView(): boolean {
-  try {
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarGlomLevel /t REG_DWORD /d 2 /f',
-    );
-    console.log("Task view disabled");
-    return true;
-  } catch (error) {
-    console.error("Failed to disable task view:", error);
-    return false;
-  }
-}
-
-/**
- * Enable Windows task view
- * @returns True if successful
- */
-export function enableTaskView(): boolean {
-  try {
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarGlomLevel /t REG_DWORD /d 0 /f',
-    );
-    console.log("Task view enabled");
-    return true;
-  } catch (error) {
-    console.error("Failed to enable task view:", error);
-    return false;
-  }
+		console.log('Windows hot corners enabled');
+		return true;
+	} catch (error) {
+		console.error('Failed to enable hot corners:', error);
+		return false;
+	}
 }
 
 /**
@@ -485,16 +315,14 @@ export function enableTaskView(): boolean {
  * @returns True if successful
  */
 export function disableActionCenter(): boolean {
-  try {
-    exec(
-      'reg add "HKCU\\Software\\Policies\\Microsoft\\Windows\\Explorer" /v DisableNotificationCenter /t REG_DWORD /d 1 /f',
-    );
-    console.log("Action Center disabled");
-    return true;
-  } catch (error) {
-    console.error("Failed to disable Action Center:", error);
-    return false;
-  }
+	try {
+		exec('reg add "HKCU\\Software\\Policies\\Microsoft\\Windows\\Explorer" /v DisableNotificationCenter /t REG_DWORD /d 1 /f');
+		console.log('Action Center disabled');
+		return true;
+	} catch (error) {
+		console.error('Failed to disable Action Center:', error);
+		return false;
+	}
 }
 
 /**
@@ -502,16 +330,14 @@ export function disableActionCenter(): boolean {
  * @returns True if successful
  */
 export function enableActionCenter(): boolean {
-  try {
-    exec(
-      'reg add "HKCU\\Software\\Policies\\Microsoft\\Windows\\Explorer" /v DisableNotificationCenter /t REG_DWORD /d 0 /f',
-    );
-    console.log("Action Center enabled");
-    return true;
-  } catch (error) {
-    console.error("Failed to enable Action Center:", error);
-    return false;
-  }
+	try {
+		exec('reg add "HKCU\\Software\\Policies\\Microsoft\\Windows\\Explorer" /v DisableNotificationCenter /t REG_DWORD /d 0 /f');
+		console.log('Action Center enabled');
+		return true;
+	} catch (error) {
+		console.error('Failed to enable Action Center:', error);
+		return false;
+	}
 }
 
 /**
@@ -519,28 +345,22 @@ export function enableActionCenter(): boolean {
  * @returns True if successful
  */
 export function disableTouchpadGestures(): boolean {
-  try {
-    // Disable edge swipes
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v EdgeSwipeEnabled /t REG_DWORD /d 0 /f',
-    );
+	try {
+		// Disable edge swipes
+		exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v EdgeSwipeEnabled /t REG_DWORD /d 0 /f');
 
-    // Disable three finger gestures
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v ThreeFingerSlideEnabled /t REG_DWORD /d 0 /f',
-    );
+		// Disable three finger gestures
+		exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v ThreeFingerSlideEnabled /t REG_DWORD /d 0 /f');
 
-    // Disable four finger gestures
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v FourFingerSlideEnabled /t REG_DWORD /d 0 /f',
-    );
+		// Disable four finger gestures
+		exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v FourFingerSlideEnabled /t REG_DWORD /d 0 /f');
 
-    console.log("Touchpad gestures disabled");
-    return true;
-  } catch (error) {
-    console.error("Failed to disable touchpad gestures:", error);
-    return false;
-  }
+		console.log('Touchpad gestures disabled');
+		return true;
+	} catch (error) {
+		console.error('Failed to disable touchpad gestures:', error);
+		return false;
+	}
 }
 
 /**
@@ -548,83 +368,20 @@ export function disableTouchpadGestures(): boolean {
  * @returns True if successful
  */
 export function enableTouchpadGestures(): boolean {
-  try {
-    // Enable edge swipes
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v EdgeSwipeEnabled /t REG_DWORD /d 1 /f',
-    );
+	try {
+		// Enable edge swipes
+		exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v EdgeSwipeEnabled /t REG_DWORD /d 1 /f');
 
-    // Enable three finger gestures
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v ThreeFingerSlideEnabled /t REG_DWORD /d 1 /f',
-    );
+		// Enable three finger gestures
+		exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v ThreeFingerSlideEnabled /t REG_DWORD /d 1 /f');
 
-    // Enable four finger gestures
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v FourFingerSlideEnabled /t REG_DWORD /d 1 /f',
-    );
+		// Enable four finger gestures
+		exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v FourFingerSlideEnabled /t REG_DWORD /d 1 /f');
 
-    console.log("Touchpad gestures enabled");
-    return true;
-  } catch (error) {
-    console.error("Failed to enable touchpad gestures:", error);
-    return false;
-  }
-}
-
-/**
- * Hide taskbar
- * @returns True if successful
- */
-export function hideTaskbar(): boolean {
-  try {
-    // Более безопасный метод скрытия панели задач
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSmallIcons /t REG_DWORD /d 1 /f',
-    );
-    
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSizeMove /t REG_DWORD /d 0 /f',
-    );
-    
-    // Используем PowerShell для скрытия панели задач через StuckRects3
-    // Но сохраняем флаг для восстановления
-    exec(
-      "powershell -command \"&{$p='HKCU:SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3';$v=(Get-ItemProperty -Path $p).Settings;$v[8]=3;&Set-ItemProperty -Path $p -Name Settings -Value $v;Stop-Process -f -ProcessName explorer;Start-Process explorer}\"",
-    );
-    
-    console.log("Taskbar hidden");
-    return true;
-  } catch (error) {
-    console.error("Failed to hide taskbar:", error);
-    return false;
-  }
-}
-
-/**
- * Show taskbar
- * @returns True if successful
- */
-export function showTaskbar(): boolean {
-  try {
-    // Восстанавливаем размер панели задач
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSmallIcons /t REG_DWORD /d 0 /f',
-    );
-    
-    exec(
-      'reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced" /v TaskbarSizeMove /t REG_DWORD /d 1 /f',
-    );
-    
-    // Используем PowerShell для отображения панели задач через StuckRects3
-    exec(
-      "powershell -command \"&{$p='HKCU:SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\StuckRects3';$v=(Get-ItemProperty -Path $p).Settings;$v[8]=2;&Set-ItemProperty -Path $p -Name Settings -Value $v;Stop-Process -f -ProcessName explorer;Start-Process explorer}\"",
-    );
-    
-    console.log("Taskbar shown");
-    return true;
-  } catch (error) {
-    console.error("Failed to show taskbar:", error);
-    return false;
-  }
+		console.log('Touchpad gestures enabled');
+		return true;
+	} catch (error) {
+		console.error('Failed to enable touchpad gestures:', error);
+		return false;
+	}
 }
