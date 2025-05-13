@@ -11,6 +11,7 @@ export function disableTouchpadGestures(): boolean {
         // Disable four finger gestures
         exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v FourFingerSlideEnabled /t REG_DWORD /d 0 /f');
 
+        exec('taskkill /f /im explorer.exe && start explorer.exe');
         console.log('Touchpad gestures disabled');
         return true;
     } catch (error) {
@@ -29,6 +30,8 @@ export function enableTouchpadGestures(): boolean {
 
         // Enable four finger gestures
         exec('reg add "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\PrecisionTouchPad" /v FourFingerSlideEnabled /t REG_DWORD /d 1 /f');
+
+        exec('taskkill /f /im explorer.exe && start explorer.exe');
 
         console.log('Touchpad gestures enabled');
         return true;

@@ -1,34 +1,31 @@
-import { disableHotCorners, enableHotCorners } from './hot-corners';
-import { disableActionCenter, enableActionCenter } from './notification';
-import { disableTouchpadGestures, enableTouchpadGestures } from './touchpad';
-import { blockWindowsKeyRegistry, restoreWindowsKeyRegistry } from './windows-keys';
-import { hideTaskbar, showTaskbar } from './taskbar';
+import {disableHotCorners, enableHotCorners} from './hot-corners';
+import {disableActionCenter, enableActionCenter} from './notification';
+import {disableTouchpadGestures, enableTouchpadGestures} from './touchpad';
+import {blockWindowsKeyRegistry, restoreWindowsKeyRegistry} from './windows-keys';
 
 
 export function enhanceKioskMode(enable: boolean): boolean {
-	if (process.platform !== 'win32') return false;
+    if (process.platform !== 'win32') return false;
 
-	if (enable) {
+    if (enable) {
 
-		blockWindowsKeyRegistry();
-		disableHotCorners();
-		disableActionCenter();
-		hideTaskbar();
-		disableTouchpadGestures();
+        blockWindowsKeyRegistry();
+        disableHotCorners();
+        disableActionCenter();
+        disableTouchpadGestures();
 
-		return true;
-	} else {
-		try {
-			restoreWindowsKeyRegistry();
-			enableHotCorners();
-			enableActionCenter();
-			showTaskbar();
-			enableTouchpadGestures();
+        return true;
+    } else {
+        try {
+            restoreWindowsKeyRegistry();
+            enableHotCorners();
+            enableActionCenter();
+            enableTouchpadGestures();
 
-			return true;
-		} catch (error) {
-			console.error('Failed to disable kiosk mode:', error);
-			return false;
-		}
-	}
+            return true;
+        } catch (error) {
+            console.error('Failed to disable kiosk mode:', error);
+            return false;
+        }
+    }
 }
